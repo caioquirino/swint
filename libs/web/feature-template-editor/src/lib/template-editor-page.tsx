@@ -50,6 +50,7 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
       ? { title: loaded.title, durationMin: String(loaded.durationMin), instructionsMd: loaded.instructionsMd, rubricMd: loaded.rubricMd }
       : EMPTY,
   );
+  const baseUpdatedAt = useRef(loaded?.updatedAt);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -88,7 +89,7 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
       if (loaded) {
         const latest = await api.templates.get({ id: loaded.id });
         if (
-          latest.updatedAt !== loaded.updatedAt &&
+          latest.updatedAt !== baseUpdatedAt.current &&
           !window.confirm('This template was changed by someone else since you opened it. Overwrite their changes?')
         ) {
           return;

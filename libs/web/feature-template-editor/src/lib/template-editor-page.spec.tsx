@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { fakeApi, renderWithApi } from '@swint/web-data-access-api/testing';
 
@@ -104,6 +104,35 @@ describe('TemplateEditorPage (edit)', () => {
       routePath: '/templates/:templateId',
     });
     await screen.findByDisplayValue('URL shortener');
+    await userEvent.click(screen.getByRole('button', { name: 'Save template' }));
+    await waitFor(() => expect(confirm).toHaveBeenCalled());
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('overwrites after the user confirms a concurrent edit', async () => {
+    const update = vi.fn(async () => existing);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    let calls = 0;
+    render({ get: async () => (calls++ === 0 ? existing : { ...existing, updatedAt: 200 }), update });
+    await screen.findByDisplayValue('URL shortener');
+    await userEvent.click(screen.getByRole('button', { name: 'Save template' }));
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(confirm).toHaveBeenCalled();
+  });
+
+  it('keeps the original baseline when cached query data changes while mounted', async () => {
+    const update = vi.fn(async () => existing);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    let calls = 0;
+    const { queryClient } = renderWithApi(<TemplateEditorPage />, {
+      api: fakeApi({ templates: { get: async () => (calls++ === 0 ? existing : { ...existing, updatedAt: 200 }), getSeed: async () => seed, update } }),
+      path: '/templates/t1',
+      routePath: '/templates/:templateId',
+    });
+    await screen.findByDisplayValue('URL shortener');
+    act(() => {
+      queryClient.setQueriesData({ queryKey: [['templates', 'get']] }, { ...existing, updatedAt: 200 });
+    });
     await userEvent.click(screen.getByRole('button', { name: 'Save template' }));
     await waitFor(() => expect(confirm).toHaveBeenCalled());
     expect(update).not.toHaveBeenCalled();
