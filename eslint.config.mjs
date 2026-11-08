@@ -27,7 +27,11 @@ export default [
                         "^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$"
                     ],
                     depConstraints: [
-                        { sourceTag: 'scope:shared', onlyDependOnLibsWithTags: ['scope:shared'] },
+                        {
+                            sourceTag: 'scope:shared',
+                            onlyDependOnLibsWithTags: ['scope:shared'],
+                            bannedExternalImports: ['node:*', 'fs', 'path', 'crypto', 'os', 'react', 'react-dom', '@excalidraw/*', '@hocuspocus/*'],
+                        },
                         { sourceTag: 'scope:web', onlyDependOnLibsWithTags: ['scope:web', 'scope:shared'] },
                         { sourceTag: 'scope:api', onlyDependOnLibsWithTags: ['scope:api', 'scope:shared'] },
                         { sourceTag: 'type:contract', onlyDependOnLibsWithTags: ['type:contract', 'type:util'] },
