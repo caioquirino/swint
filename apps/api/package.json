@@ -91,6 +91,13 @@
       "serve": {
         "continuous": true,
         "executor": "nx:run-commands",
+        "options": {
+          "command": "tsx watch --conditions=swint --clear-screen=false apps/api/src/main.ts"
+        }
+      },
+      "serve-dist": {
+        "continuous": true,
+        "executor": "nx:run-commands",
         "dependsOn": [
           "build"
         ],

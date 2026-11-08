@@ -20,6 +20,7 @@ const raw = z.object({
   BUCKET_NAME: z.string().default('swint'),
   DEFAULT_ORG_ID: z.string().default('default'),
   ENSURE_INFRA: z.stringbool().optional(),
+  SEED_DEV_DATA: z.stringbool().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
@@ -67,6 +68,7 @@ export const configSchema = raw.transform((env, ctx) => {
     bucketName: env.BUCKET_NAME,
     defaultOrgId: env.DEFAULT_ORG_ID,
     ensureInfra: env.ENSURE_INFRA ?? !prod,
+    seedDevData: env.SEED_DEV_DATA ?? env.NODE_ENV === 'development',
     logLevel: env.LOG_LEVEL,
   };
 });

@@ -50,4 +50,10 @@ describe('loadConfig', () => {
     expect(cfg.publicBaseUrl).toBe('https://swint.example.com');
     expect(cfg.oidcIssuer).toBe('https://id.example.com/realms/swint');
   });
+  it('seeds dev data by default only in development', () => {
+    expect(loadConfig({ NODE_ENV: 'development' }).seedDevData).toBe(true);
+    expect(loadConfig({ NODE_ENV: 'test' }).seedDevData).toBe(false);
+    expect(loadConfig({ NODE_ENV: 'development', SEED_DEV_DATA: 'false' }).seedDevData).toBe(false);
+    expect(loadConfig({ NODE_ENV: 'test', SEED_DEV_DATA: 'true' }).seedDevData).toBe(true);
+  });
 });

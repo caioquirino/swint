@@ -9,7 +9,8 @@ Requirements: Node 24, pnpm 12 (see `mise.toml`), Docker.
 ```bash
 pnpm install
 docker compose up -d          # Keycloak :8080, DynamoDB Local :8000, S3Mock :9090
-pnpm nx serve api             # API :3000 (creates the table and bucket on first start)
+pnpm nx serve api   # API :3000 with watch mode; seeds the "Design a URL shortener" template in development
+# pnpm nx serve-dist api   # run the built output instead
 ```
 
 Test users (Keycloak realm `swint`, password `password`): `interviewer1`, `interviewer2`, `admin`.

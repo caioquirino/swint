@@ -31,6 +31,7 @@ import { createCollabServer, type CollabLogger, type CollabServer } from '@swint
 import type { SessionEvents } from '@swint/api-feature-sessions';
 import { randomToken, systemClock, ulidIds } from '@swint/api-util-rpc';
 import type { AppConfig } from './config.js';
+import { seedDevData } from './dev-seed.js';
 import { buildRouter } from './router.js';
 import { buildServer } from './server.js';
 
@@ -109,6 +110,10 @@ export async function createApp(
     blobs: createBlobStore(s3, config.bucketName),
   };
   const clock = systemClock;
+  let devSeedResult: 'created' | 'exists' | undefined;
+  if (config.seedDevData) {
+    devSeedResult = await seedDevData({ templates: repos.templates, blobs: repos.blobs, clock, newId: ulidIds, orgId: config.defaultOrgId });
+  }
   const secureCookies = config.nodeEnv === 'production';
   const oidc =
     overrides.oidc ??
@@ -168,6 +173,7 @@ export async function createApp(
   eventsTarget.current = composeEvents(server.log, collab.events, overrides.events);
   // The upgrade listener must exist before listen().
   collab.attach(server.server);
+  if (devSeedResult) server.log.info({ result: devSeedResult }, 'dev seed');
   await server.ready();
 
   return {
