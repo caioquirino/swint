@@ -265,4 +265,57 @@ describe('collab server: persistence', () => {
     expect(kit.putCalls).toBe(calls);
     a.destroy();
   });
+
+  async function threeDirtyDocs(mode: 'hang' | 'fail') {
+    const first = await setup('live', { shutdownTimeoutMs: 1500, storeRetryMs: 60_000 });
+    const sessions = [first, await seedSession(kit, { id: 'extra-1', status: 'live' }), await seedSession(kit, { id: 'extra-2', status: 'live' })];
+    if (mode === 'hang') kit.hangPuts = true;
+    else kit.failPuts = true;
+    const clients = [];
+    for (const s of sessions) {
+      const c = connectClient(kit, docName.board(s.id), 'ada');
+      await c.synced;
+      getBoardElements(c.doc).set('e1', { id: 'e1', version: 1, versionNonce: 1, index: 'a0', isDeleted: false });
+      clients.push(c);
+    }
+    // failing puts: wait until the (real-sleep) retries are exhausted for all three documents
+    if (mode === 'fail') await expect.poll(() => kit.errors.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(3);
+    else await new Promise((r) => setTimeout(r, 300));
+    return { sessions, clients };
+  }
+
+  it('close() is bounded when S3 puts hang', async () => {
+    const { sessions, clients } = await threeDirtyDocs('hang');
+    const t0 = Date.now();
+    await kit.collab.close();
+    expect(Date.now() - t0).toBeLessThan(2000);
+    const entry = kit.errors.find((e) => 'unsaved' in e) as { unsaved: string[]; count: number };
+    expect(entry.count).toBe(3);
+    expect([...entry.unsaved].sort()).toEqual(sessions.map((s) => docName.board(s.id)).sort());
+    clients.forEach((c) => c.destroy());
+  });
+
+  it('close() is bounded when S3 puts fail, with one final attempt per document', async () => {
+    const { sessions, clients } = await threeDirtyDocs('fail');
+    const before = kit.putCalls;
+    const t0 = Date.now();
+    await kit.collab.close();
+    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(kit.putCalls - before).toBe(3);
+    const entry = kit.errors.find((e) => 'unsaved' in e) as { unsaved: string[]; count: number };
+    expect(entry.count).toBe(3);
+    expect([...entry.unsaved].sort()).toEqual(sessions.map((s) => docName.board(s.id)).sort());
+    clients.forEach((c) => c.destroy());
+  });
+
+  it('refuses new upgrades once close() has begun', async () => {
+    const { clients } = await threeDirtyDocs('hang');
+    const closing = kit.collab.close();
+    const late = connectClient(kit, docName.board('extra-1'), 'ada');
+    const outcome = await Promise.race([late.synced.then(() => 'synced'), late.closed.then(() => 'closed')]);
+    expect(outcome).toBe('closed');
+    await closing;
+    late.destroy();
+    clients.forEach((c) => c.destroy());
+  });
 });

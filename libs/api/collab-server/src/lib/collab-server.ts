@@ -27,6 +27,8 @@ export interface CollabServerDeps {
   checkpointIntervalMs?: number;
   /** Delay before retrying the store of an unsaved document whose last client left. Default 5000. */
   storeRetryMs?: number;
+  /** Overall budget for close(). Default 8000, to fit inside the API's 10 s shutdown. */
+  shutdownTimeoutMs?: number;
   /** Backoff sleep for S3 write retries; defaults to setTimeout. Tests inject a fast one. */
   sleep?: (ms: number) => Promise<void>;
 }
@@ -45,7 +47,6 @@ export interface CollabServer {
 type AuthContext = CollabContext & { authSession?: SessionRecord };
 
 const SHUTDOWN_POLL_MS = 50;
-const SHUTDOWN_MAX_MS = 5000;
 
 export function createCollabServer(deps: CollabServerDeps): CollabServer {
   const { logger } = deps;
@@ -56,9 +57,10 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
   /** Documents whose last store failed; they must not be unloaded until a store succeeds. */
   const unsaved = new Set<string>();
   let closing = false;
+  let shuttingDown = false;
   const retryTimers = new Map<string, NodeJS.Timeout>();
 
-  async function persist(document: Y.Doc, documentName: string, orgId: string | undefined): Promise<void> {
+  async function persist(document: Y.Doc, documentName: string, orgId: string | undefined, retries?: number): Promise<void> {
     const target = targetOf(documentName);
     if (!orgId) {
       unsaved.add(documentName);
@@ -68,7 +70,7 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       throw new Error('collab: cannot store document, org unknown');
     }
     try {
-      await docStore.store(orgId, target, Y.encodeStateAsUpdate(document));
+      await docStore.store(orgId, target, Y.encodeStateAsUpdate(document), { retries: retries ?? (shuttingDown ? 0 : undefined) });
       unsaved.delete(documentName);
       const pending = retryTimers.get(documentName);
       if (pending) clearTimeout(pending);
@@ -153,6 +155,7 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
     // would drop the edits. Keep unsaved documents in memory and retry until the store succeeds.
     async beforeUnloadDocument({ document, documentName }) {
       if (!unsaved.has(documentName)) return;
+      if (shuttingDown) throw new Error('collab: shutting down, not unloading unsaved document');
       // A failure throws, which aborts the unload; persist has armed the retry.
       await persist(document, documentName, orgByDocument.get(documentName));
     },
@@ -178,28 +181,45 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       handles.push(attachUpgradeHandler(httpServer, { path, hocuspocus, resolveIdentity: deps.resolveIdentity, logger }));
     },
     async close() {
+      const total = deps.shutdownTimeoutMs ?? 8000;
+      shuttingDown = true;
+      const start = Date.now();
+      const deadline = start + total;
+      // Refuse new upgrades (and drop sockets) right away; the drain below only needs the documents.
+      const handlesClosing = Promise.all(handles.splice(0).map((h) => h.close()));
       hocuspocus.flushPendingStores();
       hocuspocus.closeConnections();
-      const deadline = Date.now() + SHUTDOWN_MAX_MS;
-      while (hocuspocus.getDocumentsCount() > 0 && Date.now() < deadline) {
+      // Documents whose last store failed never unload, so stop waiting once only those remain.
+      const waitDeadline = start + total * 0.75;
+      const onlyUnsavedLeft = () => [...hocuspocus.documents.keys()].every((n) => unsaved.has(n));
+      while (hocuspocus.getDocumentsCount() > 0 && !onlyUnsavedLeft() && Date.now() < waitDeadline) {
         await new Promise((r) => setTimeout(r, SHUTDOWN_POLL_MS));
       }
       closing = true;
       for (const t of retryTimers.values()) clearTimeout(t);
       retryTimers.clear();
-      for (const name of [...unsaved]) {
-        const doc = hocuspocus.documents.get(name);
-        if (!doc) continue;
-        try {
-          await persist(doc, name, orgByDocument.get(name));
-        } catch {
-          // already logged by persist; reported once below
-        }
+      // Final pass: one attempt per remaining document, in parallel, bounded by the remaining budget.
+      const remaining = [...hocuspocus.documents.entries()];
+      const saved = new Set<string>();
+      const final = Promise.allSettled(
+        remaining.map(async ([name, doc]) => {
+          await persist(doc, name, orgByDocument.get(name), 0);
+          saved.add(name);
+        }),
+      );
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([
+        final,
+        new Promise<void>((r) => {
+          timer = setTimeout(r, Math.max(0, deadline - Date.now()));
+        }),
+      ]);
+      clearTimeout(timer);
+      const left = remaining.map(([n]) => n).filter((n) => !saved.has(n));
+      if (left.length > 0) {
+        logger.error({ unsaved: left, count: left.length }, 'collab: shutting down with unsaved documents');
       }
-      if (unsaved.size > 0) {
-        logger.error({ unsaved: [...unsaved], count: unsaved.size }, 'collab: shutting down with unsaved documents');
-      }
-      await Promise.all(handles.splice(0).map((h) => h.close()));
+      await handlesClosing;
     },
   };
 }

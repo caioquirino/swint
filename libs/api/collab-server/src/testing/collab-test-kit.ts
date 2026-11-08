@@ -17,6 +17,8 @@ export interface CollabTestKit {
   identities: Map<string, Identity>;
   /** While true, every blob write through the collab server fails. */
   failPuts: boolean;
+  /** While true, blob writes through the collab server never settle. */
+  hangPuts: boolean;
   /** Number of blob writes attempted through the collab server. */
   putCalls: number;
   /** Messages passed to the logger at error level. */
@@ -27,7 +29,7 @@ export interface CollabTestKit {
 const silentLogger: CollabLogger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined };
 
 export async function startCollabTestKit(
-  opts: Partial<Pick<CollabServerDeps, 'debounceMs' | 'maxDebounceMs' | 'checkpointIntervalMs' | 'sleep' | 'storeRetryMs'>> & {
+  opts: Partial<Pick<CollabServerDeps, 'debounceMs' | 'maxDebounceMs' | 'checkpointIntervalMs' | 'sleep' | 'storeRetryMs' | 'shutdownTimeoutMs'>> & {
     now?: () => number;
     /** Reuse existing stores (simulates a server restart over the same table and bucket). */
     stores?: TestStores;
@@ -35,12 +37,13 @@ export async function startCollabTestKit(
 ): Promise<CollabTestKit> {
   const stores = opts.stores ?? (await createTestStores());
   const errors: object[] = [];
-  const state = { failPuts: false, putCalls: 0 };
+  const state = { failPuts: false, hangPuts: false, putCalls: 0 };
   const blobs = new Proxy(stores.blobs, {
     get(target, prop, receiver) {
       if (prop === 'putBytes') {
         return async (...args: Parameters<typeof target.putBytes>) => {
           state.putCalls++;
+          if (state.hangPuts) return new Promise<void>(() => undefined);
           if (state.failPuts) throw new Error('injected s3 failure');
           return target.putBytes(...args);
         };
@@ -58,6 +61,7 @@ export async function startCollabTestKit(
     logger: { ...silentLogger, error: (o) => void errors.push(o) },
     sleep: opts.sleep,
     storeRetryMs: opts.storeRetryMs,
+    shutdownTimeoutMs: opts.shutdownTimeoutMs,
     debounceMs: opts.debounceMs,
     maxDebounceMs: opts.maxDebounceMs,
     checkpointIntervalMs: opts.checkpointIntervalMs,
@@ -75,6 +79,12 @@ export async function startCollabTestKit(
     },
     get putCalls() {
       return state.putCalls;
+    },
+    get hangPuts() {
+      return state.hangPuts;
+    },
+    set hangPuts(v: boolean) {
+      state.hangPuts = v;
     },
     errors,
     url: `ws://127.0.0.1:${port}/collab`,

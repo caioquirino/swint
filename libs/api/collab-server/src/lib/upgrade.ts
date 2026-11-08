@@ -50,7 +50,15 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
 
   // Must never throw: an exception escaping an 'upgrade' listener kills the process.
+  let closed = false;
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+    if (closed) {
+      // Draining: refuse instead of leaving the socket dangling with no listener.
+      socket.on('error', () => undefined);
+      socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     const url = parseTarget(req.url);
     if (!url) {
       socket.on('error', () => undefined);
@@ -112,8 +120,10 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
 
   return {
     close() {
-      httpServer.off('upgrade', onUpgrade);
+      closed = true;
       for (const ws of wss.clients) ws.terminate();
+      // The listener stays attached on purpose: with none, Node leaves late upgrade sockets dangling and
+      // the HTTP server can never finish closing. It now answers them with 503.
       return new Promise<void>((resolve) => wss.close(() => resolve()));
     },
   };
