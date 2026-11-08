@@ -26,15 +26,24 @@ importers:
       '@hocuspocus/server':
         specifier: ^4.8.0
         version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
+      '@orpc/client':
+        specifier: ^1.16.2
+        version: 1.16.2
       '@orpc/contract':
         specifier: ^1.16.2
         version: 1.16.2
       '@orpc/openapi':
         specifier: ^1.16.2
         version: 1.16.2(crossws@0.4.17)(fastify@5.12.8)(ws@8.22.1)
+      '@orpc/openapi-client':
+        specifier: ^1.16.2
+        version: 1.16.2
       '@orpc/server':
         specifier: ^1.16.2
         version: 1.16.2(crossws@0.4.17)(fastify@5.12.8)(ws@8.22.1)
+      '@orpc/tanstack-query':
+        specifier: ^1.16.2
+        version: 1.16.2(@orpc/client@1.16.2)(@tanstack/query-core@5.107.1)
       '@orpc/zod':
         specifier: ^1.16.2
         version: 1.16.2(@orpc/contract@1.16.2)(@orpc/server@1.16.2(crossws@0.4.17)(fastify@5.12.8)(ws@8.22.1))(crossws@0.4.17)(fastify@5.12.8)(ws@8.22.1)(zod@4.6.7)
@@ -268,6 +277,15 @@ importers:
       '@hocuspocus/provider':
         specifier: ^4.8.0
         version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
+      '@orpc/client':
+        specifier: ^1.16.2
+        version: 1.16.2
+      '@orpc/contract':
+        specifier: ^1.16.2
+        version: 1.16.2
+      '@orpc/openapi-client':
+        specifier: ^1.16.2
+        version: 1.16.2
       '@swint/shared-collab-protocol':
         specifier: workspace:*
         version: link:../../libs/shared/collab-protocol
@@ -457,6 +475,33 @@ importers:
 
   libs/shared/domain:
     dependencies:
+      tslib:
+        specifier: ^2.3.0
+        version: 2.8.1
+
+  libs/web/data-access-api:
+    dependencies:
+      '@orpc/client':
+        specifier: ^1.16.2
+        version: 1.16.2
+      '@orpc/contract':
+        specifier: ^1.16.2
+        version: 1.16.2
+      '@orpc/openapi-client':
+        specifier: ^1.16.2
+        version: 1.16.2
+      '@orpc/tanstack-query':
+        specifier: ^1.16.2
+        version: 1.16.2(@orpc/client@1.16.2)(@tanstack/query-core@5.107.1)
+      '@swint/shared-api-contract':
+        specifier: workspace:*
+        version: link:../../shared/api-contract
+      '@tanstack/react-query':
+        specifier: ^5.107.1
+        version: 5.107.1(@types/react@19.3.0)(react@19.3.1)
+      react:
+        specifier: ^19.0.0
+        version: 19.3.1
       tslib:
         specifier: ^2.3.0
         version: 2.8.1
@@ -2217,6 +2262,12 @@ packages:
 
   '@orpc/standard-server@1.16.2':
     resolution: {integrity: sha512-tfDncJE1025RNnkav67Bz9KmxX8yhOflDXTRIXs4EAy2KGK/cT1KdN3sQ1U/sEhfRKu5PYYWkAO6AvRD2NQt0g==}
+
+  '@orpc/tanstack-query@1.16.2':
+    resolution: {integrity: sha512-BKtNPbR8PS0nMSJjf0HAUR6pnP5WtJilvFKlHluXH5gKX3cWm3yktsJSxEoEAyrNZ3ia/ICPmrjJUJVrFUMWhQ==}
+    peerDependencies:
+      '@orpc/client': 1.16.2
+      '@tanstack/query-core': '>=5.80.2'
 
   '@orpc/zod@1.16.2':
     resolution: {integrity: sha512-7c0/cDfFDNSJXvcQFJqfcubh1poqKd6OlfrC93Gm8K2ReSXeds7vxn0kXoJzt1cWqqNvmPXm6xv4HnE+9r0P6w==}
@@ -8598,6 +8649,14 @@ snapshots:
   '@orpc/standard-server@1.16.2':
     dependencies:
       '@orpc/shared': 1.16.2
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
+  '@orpc/tanstack-query@1.16.2(@orpc/client@1.16.2)(@tanstack/query-core@5.107.1)':
+    dependencies:
+      '@orpc/client': 1.16.2
+      '@orpc/shared': 1.16.2
+      '@tanstack/query-core': 5.107.1
     transitivePeerDependencies:
       - '@opentelemetry/api'
 

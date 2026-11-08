@@ -41,6 +41,9 @@
     },
     {
       "path": "./libs/web/ui-primitives"
+    },
+    {
+      "path": "./libs/web/data-access-api"
     }
   ]
 }

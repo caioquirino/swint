@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createORPCClient, ORPCError } from '@orpc/client';
+import type { ContractRouterClient } from '@orpc/contract';
+import { OpenAPILink } from '@orpc/openapi-client/fetch';
+import { contract } from '@swint/shared-api-contract';
 import { COOKIE } from '@swint/api-feature-auth';
 import { setup, templateBody } from '../test/app-test-setup.js';
 
@@ -216,5 +220,27 @@ describe('API over HTTP', () => {
     });
     expect(res.statusCode).toBe(400);
     await close();
+  });
+
+  it('works with the browser oRPC client (OpenAPILink): bodyless POSTs, cookies, typed errors', async () => {
+    const app = await setup({ listen: true });
+    const cookie = Object.entries(await app.interviewerCookie())
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join('; ');
+    const client: ContractRouterClient<typeof contract> = createORPCClient(
+      new OpenAPILink(contract, { url: `http://127.0.0.1:${app.port}/api`, headers: { cookie } }),
+    );
+    const t = await client.templates.create(templateBody);
+    const { session } = await client.sessions.create({ templateId: t.id, candidateName: 'Ada' });
+    await expect(client.sessions.start({ id: session.id })).resolves.toMatchObject({ status: 'live' });
+    await expect(client.sessions.extend({ id: session.id, minutes: 5 })).resolves.toMatchObject({ extensionSec: 300 });
+    await expect(client.sessions.regenerateInvite({ id: session.id })).resolves.toHaveProperty('candidateUrl');
+    await expect(client.sessions.end({ id: session.id })).resolves.toMatchObject({ status: 'ended' });
+    await expect(client.templates.archive({ id: t.id })).resolves.toMatchObject({ archived: true });
+    await expect(client.templates.list({ includeArchived: false })).resolves.toEqual([]);
+    const err = await client.sessions.start({ id: session.id }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ORPCError);
+    expect((err as ORPCError<string, unknown>).code).toBe('CONFLICT');
+    await app.close();
   });
 });
