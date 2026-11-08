@@ -19,6 +19,9 @@ export interface ServerDeps {
   registerRoutes: (app: FastifyInstance) => void;
 }
 
+/** Upper bound for any request body; enforced by Fastify before identity resolution runs. */
+export const BODY_LIMIT_BYTES = 2 * 1024 * 1024;
+
 export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
@@ -28,6 +31,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       serializers: { req: serializeRequest },
     },
     genReqId: () => randomUUID(),
+    bodyLimit: BODY_LIMIT_BYTES,
   });
 
   await app.register(cookie, { secret: deps.config.cookieSecret });
@@ -52,9 +56,10 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   });
 
   await app.register(async (api) => {
-    // oRPC parses bodies itself; disable Fastify parsing inside this scope only.
-    api.removeAllContentTypeParsers();
-    api.addContentTypeParser('*', (_req, _payload, done) => done(null, undefined));
+    // Fastify parses (and size-limits) JSON bodies; the oRPC adapter uses `request.body` when
+    // it is defined instead of reading the raw stream. Every other body type is rejected with 415
+    // rather than streamed into oRPC unbounded.
+    api.removeContentTypeParser('text/plain');
 
     api.get('/api/openapi.json', async () => openApiDoc);
 

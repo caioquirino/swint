@@ -145,6 +145,32 @@ describe('API over HTTP', () => {
     await close();
   });
 
+  it('oversized JSON body is rejected with 413 before auth', async () => {
+    const { server, close } = await setup();
+    const big = JSON.stringify({ ...templateBody, instructionsMd: 'x'.repeat(2.1 * 1024 * 1024) });
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/templates',
+      headers: { 'content-type': 'application/json' },
+      payload: big,
+    });
+    expect(res.statusCode).toBe(413);
+    await close();
+  });
+
+  it('non-JSON request bodies under /api are rejected with 415', async () => {
+    const { server, interviewerCookie, close } = await setup();
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/templates',
+      cookies: await interviewerCookie(),
+      headers: { 'content-type': 'text/plain' },
+      payload: 'hello',
+    });
+    expect(res.statusCode).toBe(415);
+    await close();
+  });
+
   it('validation errors are 400', async () => {
     const { server, interviewerCookie, close } = await setup();
     const res = await server.inject({
