@@ -1,8 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
+    "outDir": "out-tsc/app",
+    "tsBuildInfoFile": "out-tsc/app/tsconfig.app.tsbuildinfo",
     "jsx": "react-jsx",
     "lib": [
       "dom"
@@ -45,7 +45,22 @@
   ],
   "references": [
     {
+      "path": "../../libs/web/ui-whiteboard/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/web/ui-primitives/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/web/feature-template-editor/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/web/feature-session-room/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/web/feature-dashboard/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/web/data-access-api/tsconfig.lib.json"
     }
   ]
 }

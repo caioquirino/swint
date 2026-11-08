@@ -9,6 +9,12 @@
     ]
   },
   "dependencies": {
-    "@swint/web-ui-primitives": "workspace:*"
+    "@swint/web-data-access-api": "workspace:*",
+    "@swint/web-feature-dashboard": "workspace:*",
+    "@swint/web-feature-session-room": "workspace:*",
+    "@swint/web-feature-template-editor": "workspace:*",
+    "@swint/web-ui-primitives": "workspace:*",
+    "@swint/web-ui-whiteboard": "workspace:*",
+    "@tanstack/react-query": "^5.107.1"
   }
 }

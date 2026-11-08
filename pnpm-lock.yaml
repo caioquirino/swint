@@ -328,9 +328,27 @@ importers:
 
   apps/web:
     dependencies:
+      '@swint/web-data-access-api':
+        specifier: workspace:*
+        version: link:../../libs/web/data-access-api
+      '@swint/web-feature-dashboard':
+        specifier: workspace:*
+        version: link:../../libs/web/feature-dashboard
+      '@swint/web-feature-session-room':
+        specifier: workspace:*
+        version: link:../../libs/web/feature-session-room
+      '@swint/web-feature-template-editor':
+        specifier: workspace:*
+        version: link:../../libs/web/feature-template-editor
       '@swint/web-ui-primitives':
         specifier: workspace:*
         version: link:../../libs/web/ui-primitives
+      '@swint/web-ui-whiteboard':
+        specifier: workspace:*
+        version: link:../../libs/web/ui-whiteboard
+      '@tanstack/react-query':
+        specifier: ^5.107.1
+        version: 5.107.1(@types/react@19.3.0)(react@19.3.1)
 
   libs/api/collab-server:
     dependencies:

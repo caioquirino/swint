@@ -8,10 +8,15 @@ Requirements: Node 24, pnpm 12 (see `mise.toml`), Docker.
 
 ```bash
 pnpm install
-docker compose up -d          # Keycloak :8080, DynamoDB Local :8000, S3Mock :9090
-pnpm nx serve api   # API :3000 with watch mode; seeds the "Design a URL shortener" template in development
-# pnpm nx serve-dist api   # run the built output instead
+docker compose up -d                       # Keycloak :8080, DynamoDB Local :8000, S3Mock :9090
+pnpm nx run-many -t serve -p api web       # API :3000 (watch mode) + web :4200 (Vite, proxies /api /auth /join /collab)
 ```
+
+Open http://localhost:4200 and sign in as `interviewer1` / `password`. In development the API seeds the
+"Design a URL shortener" template. Create a session from the dashboard: the candidate link (`/join/…`) is
+for the candidate (open it in a private window to try it), the interviewer link (`/s/…`) for other interviewers.
+
+If port 3000 is taken: `PORT=3100 pnpm nx serve api` and `SWINT_API_URL=http://localhost:3100 pnpm nx serve web`.
 
 Test users (Keycloak realm `swint`, password `password`): `interviewer1`, `interviewer2`, `admin`.
 Keycloak admin console: http://localhost:8080 (admin / admin).
