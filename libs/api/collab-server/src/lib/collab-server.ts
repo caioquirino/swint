@@ -4,7 +4,7 @@ import * as Y from 'yjs';
 import type { BlobStore, SessionRecord, SessionsRepo } from '@swint/api-data-access-persistence';
 import type { CookieHeaderIdentityResolver } from '@swint/api-feature-auth';
 import type { SessionEvents } from '@swint/api-feature-sessions';
-import { docName, type CloseReason } from '@swint/shared-collab-protocol';
+import { docName, POLICY_CLOSE_CODE, type CloseReason } from '@swint/shared-collab-protocol';
 import { isFinished } from '@swint/shared-domain';
 import type { Clock, Identity } from '@swint/api-util-rpc';
 import { CollabAccessError, authorizeDocument, targetOf, type DocTarget } from './access.js';
@@ -49,8 +49,8 @@ export interface CollabServer {
 type AuthContext = CollabContext & { authSession?: SessionRecord };
 
 const SHUTDOWN_POLL_MS = 50;
-/** WebSocket close code for a connection closed by policy (application range 4000–4999). */
-export const POLICY_CLOSE_CODE = 4403;
+/** Re-exported for existing importers; defined in the shared real-time contract. */
+export { POLICY_CLOSE_CODE };
 
 export function createCollabServer(deps: CollabServerDeps): CollabServer {
   const { logger } = deps;
