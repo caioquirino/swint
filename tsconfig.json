@@ -47,6 +47,9 @@
     },
     {
       "path": "./libs/web/data-access-collab"
+    },
+    {
+      "path": "./libs/web/ui-session-panels"
     }
   ]
 }
