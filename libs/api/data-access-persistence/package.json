@@ -13,6 +13,12 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./testing": {
+      "swint": "./src/testing/index.ts",
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js",
+      "default": "./dist/testing/index.js"
     }
   },
   "nx": {
@@ -23,6 +29,12 @@
     ]
   },
   "dependencies": {
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "@aws-sdk/client-dynamodb": "^3.1164.0",
+    "@aws-sdk/lib-dynamodb": "^3.1164.0",
+    "@aws-sdk/client-s3": "^3.1164.0",
+    "testcontainers": "^12.2.1",
+    "vitest": "~5.0.1",
+    "@swint/shared-domain": "workspace:*"
   }
 }

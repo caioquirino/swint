@@ -9,6 +9,9 @@ export default defineConfig(() => ({
     passWithNoTests: true,
     globals: true,
     environment: 'node',
+    globalSetup: ['./src/testing/global-setup.ts'],
+    hookTimeout: 120_000,
+    testTimeout: 30_000,
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {

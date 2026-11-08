@@ -170,9 +170,27 @@ importers:
 
   libs/api/data-access-persistence:
     dependencies:
+      '@aws-sdk/client-dynamodb':
+        specifier: ^3.1164.0
+        version: 3.1164.0
+      '@aws-sdk/client-s3':
+        specifier: ^3.1164.0
+        version: 3.1164.0
+      '@aws-sdk/lib-dynamodb':
+        specifier: ^3.1164.0
+        version: 3.1164.0(@aws-sdk/client-dynamodb@3.1164.0)
+      '@swint/shared-domain':
+        specifier: workspace:*
+        version: link:../../shared/domain
+      testcontainers:
+        specifier: ^12.2.1
+        version: 12.2.1(bare-buffer@3.7.1)(supports-color@8.1.1)
       tslib:
         specifier: ^2.3.0
         version: 2.8.1
+      vitest:
+        specifier: ~5.0.1
+        version: 5.0.5(@types/node@22.20.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@27.4.0(supports-color@8.1.1))(vite@8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(tsx@4.23.15)(yaml@2.9.0))
 
   libs/api/feature-auth:
     dependencies:
@@ -6787,6 +6805,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@kwsites/file-exists@1.1.1(supports-color@8.1.1)':
+    dependencies:
+      debug: 4.4.3(supports-color@8.1.1)
+    transitivePeerDependencies:
+      - supports-color
+
   '@napi-rs/wasm-runtime@0.2.4':
     dependencies:
       '@emnapi/core': 1.4.5
@@ -8383,6 +8407,12 @@ snapshots:
     optionalDependencies:
       supports-color: 7.2.0
 
+  debug@4.4.3(supports-color@8.1.1):
+    dependencies:
+      ms: 2.1.3
+    optionalDependencies:
+      supports-color: 8.1.1
+
   decimal.js@10.6.0: {}
 
   dedent@1.7.2(babel-plugin-macros@3.1.0):
@@ -8432,12 +8462,32 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  docker-modem@5.0.7(supports-color@8.1.1):
+    dependencies:
+      debug: 4.4.3(supports-color@8.1.1)
+      readable-stream: 3.6.2
+      split-ca: 1.0.1
+      ssh2: 1.17.0
+    transitivePeerDependencies:
+      - supports-color
+
   dockerode@5.0.1(supports-color@7.2.0):
     dependencies:
       '@balena/dockerignore': 1.0.2
       '@grpc/grpc-js': 1.14.7
       '@grpc/proto-loader': 0.7.15
       docker-modem: 5.0.7(supports-color@7.2.0)
+      protobufjs: 7.6.6
+      tar-fs: 2.1.5
+    transitivePeerDependencies:
+      - supports-color
+
+  dockerode@5.0.1(supports-color@8.1.1):
+    dependencies:
+      '@balena/dockerignore': 1.0.2
+      '@grpc/grpc-js': 1.14.7
+      '@grpc/proto-loader': 0.7.15
+      docker-modem: 5.0.7(supports-color@8.1.1)
       protobufjs: 7.6.6
       tar-fs: 2.1.5
     transitivePeerDependencies:
@@ -9113,6 +9163,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  http-proxy-agent@7.0.2(supports-color@8.1.1):
+    dependencies:
+      agent-base: 7.1.4
+      debug: 4.4.3(supports-color@8.1.1)
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
+
   http-proxy@1.18.1(debug@4.4.3(supports-color@7.2.0)):
     dependencies:
       eventemitter3: 4.0.7
@@ -9146,6 +9204,14 @@ snapshots:
       debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
+
+  https-proxy-agent@7.0.6(supports-color@8.1.1):
+    dependencies:
+      agent-base: 7.1.4
+      debug: 4.4.3(supports-color@8.1.1)
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
 
   iconv-lite@0.6.3:
     dependencies:
@@ -9652,6 +9718,35 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+
+  jsdom@27.4.0(supports-color@8.1.1):
+    dependencies:
+      '@acemir/cssom': 0.9.32
+      '@asamuzakjp/dom-selector': 6.8.1
+      '@exodus/bytes': 1.16.0
+      cssstyle: 5.3.7
+      data-urls: 6.0.1
+      decimal.js: 10.6.0
+      html-encoding-sniffer: 6.0.0
+      http-proxy-agent: 7.0.2(supports-color@8.1.1)
+      https-proxy-agent: 7.0.6(supports-color@8.1.1)
+      is-potential-custom-element-name: 1.0.1
+      parse5: 8.1.0
+      saxes: 6.0.0
+      symbol-tree: 3.2.4
+      tough-cookie: 6.1.0
+      w3c-xmlserializer: 5.0.0
+      webidl-conversions: 8.0.1
+      whatwg-mimetype: 4.0.0
+      whatwg-url: 15.1.0
+      ws: 8.22.1
+      xml-name-validator: 5.0.0
+    transitivePeerDependencies:
+      - '@noble/hashes'
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+    optional: true
 
   jsesc@3.1.0: {}
 
@@ -10237,6 +10332,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  properties-reader@3.0.1(supports-color@8.1.1):
+    dependencies:
+      '@kwsites/file-exists': 1.1.1(supports-color@8.1.1)
+      mkdirp: 3.0.1
+    transitivePeerDependencies:
+      - supports-color
+
   protobufjs@7.6.6:
     dependencies:
       '@protobufjs/aspromise': 1.1.2
@@ -10781,6 +10883,29 @@ snapshots:
       - react-native-b4a
       - supports-color
 
+  testcontainers@12.2.1(bare-buffer@3.7.1)(supports-color@8.1.1):
+    dependencies:
+      '@balena/dockerignore': 1.0.2
+      '@types/dockerode': 4.0.2
+      archiver: 7.0.1(bare-buffer@3.7.1)
+      async-lock: 1.4.1
+      byline: 5.0.0
+      debug: 4.4.3(supports-color@8.1.1)
+      docker-compose: 1.5.0
+      dockerode: 5.0.1(supports-color@8.1.1)
+      get-port: 5.1.1
+      proper-lockfile: 4.1.2
+      properties-reader: 3.0.1(supports-color@8.1.1)
+      ssh-remote-port-forward: 1.0.4
+      tar-fs: 3.1.3(bare-buffer@3.7.1)
+      tmp: 0.2.7
+      undici: 8.12.4
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
+      - supports-color
+
   text-decoder@1.2.7:
     dependencies:
       b4a: 1.9.0
@@ -11013,6 +11138,30 @@ snapshots:
       '@vitest/coverage-v8': 5.0.5(vitest@5.0.5)
       '@vitest/ui': 5.0.5(vitest@5.0.5)
       jsdom: 27.4.0(supports-color@7.2.0)
+    transitivePeerDependencies:
+      - msw
+
+  vitest@5.0.5(@types/node@22.20.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@27.4.0(supports-color@8.1.1))(vite@8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(tsx@4.23.15)(yaml@2.9.0)):
+    dependencies:
+      '@types/chai': 5.2.3
+      '@vitest/mocker': 5.0.5(vite@8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(tsx@4.23.15)(yaml@2.9.0))
+      chai: 6.3.0
+      es-module-lexer: 2.3.2
+      expect-type: 1.4.0
+      magic-string: 1.4.5
+      obug: 3.0.0
+      picomatch: 4.0.7
+      std-env: 4.3.0
+      tinybench: 6.2.3
+      tinyexec: 1.3.1
+      tinyglobby: 0.2.17
+      vite: 8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(tsx@4.23.15)(yaml@2.9.0)
+      why-is-node-running: 3.2.1
+    optionalDependencies:
+      '@types/node': 22.20.5
+      '@vitest/coverage-v8': 5.0.5(vitest@5.0.5)
+      '@vitest/ui': 5.0.5(vitest@5.0.5)
+      jsdom: 27.4.0(supports-color@8.1.1)
     transitivePeerDependencies:
       - msw
 
