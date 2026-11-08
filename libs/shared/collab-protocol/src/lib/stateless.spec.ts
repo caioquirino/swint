@@ -44,3 +44,14 @@ describe('awareness user', () => {
     expect(awarenessUserSchema.safeParse({ ...user, role: 'admin' }).success).toBe(false);
   });
 });
+
+describe('session.state invariants', () => {
+  it('rejects live without startedAt', () => {
+    expect(() => encodeServerMessage({ ...msg, status: 'live', startedAt: null })).toThrow();
+    expect(parseServerMessage(JSON.stringify({ ...msg, status: 'live', startedAt: null }))).toBeNull();
+  });
+  it('allows created/cancelled without startedAt', () => {
+    expect(parseServerMessage(JSON.stringify({ ...msg, status: 'created', startedAt: null }))).not.toBeNull();
+    expect(parseServerMessage(JSON.stringify({ ...msg, status: 'cancelled', startedAt: null }))).not.toBeNull();
+  });
+});

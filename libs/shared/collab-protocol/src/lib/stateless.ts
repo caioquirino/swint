@@ -3,14 +3,19 @@ import { SESSION_STATUSES, type SessionStatus } from '@swint/shared-domain';
 
 const epochMs = z.number().int().nonnegative();
 
-export const sessionStateMessageSchema = z.object({
-  type: z.literal('session.state'),
-  status: z.enum(SESSION_STATUSES as [SessionStatus, ...SessionStatus[]]),
-  startedAt: epochMs.nullable(),
-  durationSec: z.number().int().nonnegative(),
-  extensionSec: z.number().int().nonnegative(),
-  serverNow: epochMs,
-});
+export const sessionStateMessageSchema = z
+  .object({
+    type: z.literal('session.state'),
+    status: z.enum(SESSION_STATUSES as [SessionStatus, ...SessionStatus[]]),
+    startedAt: epochMs.nullable(),
+    durationSec: z.number().int().nonnegative(),
+    extensionSec: z.number().int().nonnegative(),
+    serverNow: epochMs,
+  })
+  .refine((m) => m.status !== 'live' || m.startedAt !== null, {
+    message: 'live sessions must have startedAt',
+    path: ['startedAt'],
+  });
 
 export type SessionStateMessage = z.infer<typeof sessionStateMessageSchema>;
 
