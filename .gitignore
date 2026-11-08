@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+tmp
+out-tsc
+.nx/cache
+.nx/workspace-data
+.nx/polygraph
+.claude/worktrees
+.claude/settings.local.json
+*.tsbuildinfo
+.env
+.env.local
+.superpowers

@@ -1,0 +1,12 @@
+[tools]
+node = "24"
+pnpm = "12"
+
+[settings]
+idiomatic_version_file_enable_tools = ["pnpm"]
+
+[tasks.pnpm-install]
+description = "Install dependencies with pnpm"
+run = "pnpm install"
+sources = ["package.json", "pnpm-lock.yaml", "mise.toml"]
+outputs = ["node_modules/.pnpm/lock.yaml"]
