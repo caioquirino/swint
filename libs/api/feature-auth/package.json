@@ -23,6 +23,11 @@
     ]
   },
   "dependencies": {
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "@swint/api-util-rpc": "workspace:*",
+    "@swint/api-data-access-persistence": "workspace:*",
+    "@swint/shared-domain": "workspace:*",
+    "fastify": "^5.12.8",
+    "@fastify/cookie": "^11.1.5"
   }
 }
