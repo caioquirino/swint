@@ -55,22 +55,28 @@
   ],
   "references": [
     {
-      "path": "../ui-primitives/tsconfig.lib.json"
-    },
-    {
-      "path": "../data-access-api/tsconfig.lib.json"
+      "path": "../ui-whiteboard/tsconfig.lib.json"
     },
     {
       "path": "../ui-session-panels/tsconfig.lib.json"
     },
     {
-      "path": "../../shared/api-contract/tsconfig.lib.json"
+      "path": "../ui-primitives/tsconfig.lib.json"
+    },
+    {
+      "path": "../data-access-collab/tsconfig.lib.json"
+    },
+    {
+      "path": "../data-access-api/tsconfig.lib.json"
+    },
+    {
+      "path": "../../shared/domain/tsconfig.lib.json"
     },
     {
       "path": "../../shared/collab-protocol/tsconfig.lib.json"
     },
     {
-      "path": "../../shared/domain/tsconfig.lib.json"
+      "path": "../../shared/api-contract/tsconfig.lib.json"
     }
   ]
 }

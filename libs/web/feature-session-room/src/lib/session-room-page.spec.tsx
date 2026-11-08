@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import { fakeApi, orpcError, renderWithApi } from '@swint/web-data-access-api/testing';
+import { CollabFactoryProvider } from '@swint/web-data-access-collab';
+import { createFakeCollabSession } from '@swint/web-data-access-collab/testing';
 import { SessionRoomPage } from './session-room-page.js';
+
+vi.mock('@swint/web-ui-whiteboard', () => ({
+  CollaborativeBoard: () => <div data-testid="board" />,
+  EXPORT_FORMATS: ['png', 'svg', 'excalidraw'],
+  exportFileName: (t: string, f: string) => `${t}.${f}`,
+  downloadBlob: vi.fn(),
+}));
 
 const base = { sessionId: 's1', title: 'URL shortener', timer: { startedAt: 1000, durationSec: 2700, extensionSec: 0 } };
 const candidate = (status: 'created' | 'live') => ({ ...base, role: 'candidate', status, instructionsMd: status === 'created' ? null : '# Task', me: { name: 'Bo' } });
@@ -9,8 +18,13 @@ const interviewer = (status: 'created' | 'live' | 'ended') => ({
   ...base, role: 'interviewer', status, instructionsMd: '# Task', rubricMd: '- secret rubric', candidateName: 'Bo', me: { name: 'Ada', sub: 'sub-1' },
 });
 
-const renderRoom = (get: () => Promise<unknown>, pollMs?: number) =>
-  renderWithApi(<SessionRoomPage pollMs={pollMs} />, { api: fakeApi({ room: { get } }), path: '/s/s1', routePath: '/s/:sessionId' });
+const renderRoom = (get: () => Promise<unknown>, pollMs?: number) => {
+  const fake = createFakeCollabSession({ role: 'interviewer' });
+  return renderWithApi(
+    <CollabFactoryProvider factory={fake.factory}><SessionRoomPage pollMs={pollMs} /></CollabFactoryProvider>,
+    { api: fakeApi({ room: { get } }), path: '/s/s1', routePath: '/s/:sessionId' },
+  );
+};
 
 describe('SessionRoomPage gate', () => {
   it('asks anonymous visitors to sign in (or use their invitation link)', async () => {

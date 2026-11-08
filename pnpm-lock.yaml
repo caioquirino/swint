@@ -601,12 +601,18 @@ importers:
       '@swint/web-data-access-api':
         specifier: workspace:*
         version: link:../data-access-api
+      '@swint/web-data-access-collab':
+        specifier: workspace:*
+        version: link:../data-access-collab
       '@swint/web-ui-primitives':
         specifier: workspace:*
         version: link:../ui-primitives
       '@swint/web-ui-session-panels':
         specifier: workspace:*
         version: link:../ui-session-panels
+      '@swint/web-ui-whiteboard':
+        specifier: workspace:*
+        version: link:../ui-whiteboard
       '@tanstack/react-query':
         specifier: ^5.107.1
         version: 5.107.1(@types/react@19.3.0)(react@19.3.1)
