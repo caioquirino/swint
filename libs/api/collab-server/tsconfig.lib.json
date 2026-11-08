@@ -15,7 +15,13 @@
   ],
   "references": [
     {
+      "path": "../../shared/domain/tsconfig.lib.json"
+    },
+    {
       "path": "../../shared/collab-protocol/tsconfig.lib.json"
+    },
+    {
+      "path": "../util-rpc/tsconfig.lib.json"
     },
     {
       "path": "../data-access-persistence/tsconfig.lib.json"
