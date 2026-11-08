@@ -13,7 +13,17 @@
   "include": [
     "src/**/*.ts"
   ],
-  "references": [],
+  "references": [
+    {
+      "path": "../../shared/api-contract/tsconfig.lib.json"
+    },
+    {
+      "path": "../data-access-persistence/tsconfig.lib.json"
+    },
+    {
+      "path": "../util-rpc/tsconfig.lib.json"
+    }
+  ],
   "exclude": [
     "vite.config.ts",
     "vite.config.mts",

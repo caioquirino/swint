@@ -23,6 +23,10 @@
     ]
   },
   "dependencies": {
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "@swint/api-util-rpc": "workspace:*",
+    "@swint/api-data-access-persistence": "workspace:*",
+    "@swint/shared-api-contract": "workspace:*",
+    "@orpc/server": "^1.16.2"
   }
 }
