@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import Fastify, { type FastifyInstance } from 'fastify';
+import { STATUS_CODES } from 'node:http';
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
+import type { DestinationStream } from 'pino';
 import cookie from '@fastify/cookie';
 import { onError, ORPCError } from '@orpc/server';
 import { OpenAPIHandler } from '@orpc/openapi/fastify';
@@ -9,7 +11,7 @@ import { contract } from '@swint/shared-api-contract';
 import type { IdentityResolver } from '@swint/api-feature-auth';
 import type { AppConfig } from './config.js';
 import type { AppRouter } from './router.js';
-import { serializeRequest } from './log-redaction.js';
+import { redactUrl, serializeRequest } from './log-redaction.js';
 
 export interface ServerDeps {
   config: AppConfig;
@@ -17,6 +19,8 @@ export interface ServerDeps {
   resolveIdentity: IdentityResolver;
   /** Registers non-RPC routes (auth, join). */
   registerRoutes: (app: FastifyInstance) => void;
+  /** Log destination (defaults to stdout); tests use it to capture log lines. */
+  logStream?: DestinationStream;
 }
 
 /** Upper bound for any request body; enforced by Fastify before identity resolution runs. */
@@ -29,9 +33,30 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       redact: ['req.headers.cookie', 'res.headers["set-cookie"]', 'req.headers.authorization'],
       // Never log invite tokens or OIDC authorization codes carried in the URL.
       serializers: { req: serializeRequest },
+      ...(deps.logStream ? { stream: deps.logStream } : {}),
     },
     genReqId: () => randomUUID(),
     bodyLimit: BODY_LIMIT_BYTES,
+  });
+
+  // Never echo error internals to clients: 5xx become a generic body, 4xx (validation, 413, 415, …)
+  // keep their status with the standard reason phrase.
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    const status = error.statusCode !== undefined && error.statusCode >= 400 ? error.statusCode : 500;
+    if (status >= 500) {
+      request.log.error({ err: error }, 'request failed');
+      return reply.code(500).send({ code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' });
+    }
+    // Code only: e.g. JSON parse messages can quote the request body.
+    request.log.info({ code: error.code, statusCode: status }, 'request rejected');
+    const reason = STATUS_CODES[status] ?? 'Bad Request';
+    return reply.code(status).send({ code: reason.toUpperCase().replace(/\W+/g, '_'), message: reason });
+  });
+
+  // Replaces Fastify's default 404, whose body and log line echo the raw URL (invite tokens).
+  app.setNotFoundHandler((request, reply) => {
+    request.log.info({ method: request.method, url: redactUrl(request.url) }, 'route not found');
+    return reply.code(404).send({ code: 'NOT_FOUND', message: 'Not found' });
   });
 
   await app.register(cookie, { secret: deps.config.cookieSecret });

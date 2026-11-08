@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { DestinationStream } from 'pino';
 import {
   createAuthSessionsRepo,
   createBlobStore,
@@ -51,7 +52,7 @@ export interface App {
 
 export async function createApp(
   config: AppConfig,
-  overrides: { oidc?: OidcClient; events?: SessionEvents } = {},
+  overrides: { oidc?: OidcClient; events?: SessionEvents; logStream?: DestinationStream } = {},
 ): Promise<App> {
   const aws = {
     region: config.awsRegion,
@@ -100,6 +101,7 @@ export async function createApp(
     config,
     router,
     resolveIdentity: createIdentityResolver({ ...repos, clock }),
+    ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
     registerRoutes: (app) => {
       registerAuthRoutes(app, {
         oidc,

@@ -1,4 +1,4 @@
-import { describe, expect, inject, it } from 'vitest';
+import { describe, expect, inject, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import '@swint/api-data-access-persistence/testing'; // ProvidedContext typings for inject()
 import { sha256Hex } from '@swint/api-util-rpc';
@@ -20,7 +20,7 @@ function defined<T>(value: T | undefined, what: string): T {
   return value;
 }
 
-async function setup() {
+async function setup(opts: { logLines?: string[] } = {}) {
   const suffix = randomUUID().slice(0, 8);
   const config = loadConfig({
     NODE_ENV: 'test',
@@ -28,9 +28,13 @@ async function setup() {
     S3_ENDPOINT: inject('s3Endpoint'),
     TABLE_NAME: `swint-it-${suffix}`,
     BUCKET_NAME: `swint-it-${suffix}`,
-    LOG_LEVEL: 'silent',
+    LOG_LEVEL: opts.logLines ? 'trace' : 'silent',
   });
-  const app = await createApp(config, { oidc: fakeOidc });
+  const logLines = opts.logLines;
+  const app = await createApp(config, {
+    oidc: fakeOidc,
+    ...(logLines ? { logStream: { write: (line: string) => void logLines.push(line) } } : {}),
+  });
   const server = app.server;
   const repos = app.repos; // exposed for tests (see create-app)
 
@@ -200,6 +204,7 @@ describe('API over HTTP', () => {
       payload: big,
     });
     expect(res.statusCode).toBe(413);
+    expect(res.json()).toEqual({ code: 'PAYLOAD_TOO_LARGE', message: 'Payload Too Large' });
     await close();
   });
 
@@ -213,6 +218,33 @@ describe('API over HTTP', () => {
       payload: 'hello',
     });
     expect(res.statusCode).toBe(415);
+    expect(res.json()).toEqual({ code: 'UNSUPPORTED_MEDIA_TYPE', message: 'Unsupported Media Type' });
+    await close();
+  });
+
+  it('unexpected errors outside oRPC return a generic 500 without internals (and are logged)', async () => {
+    const logLines: string[] = [];
+    const { server, repos, close } = await setup({ logLines });
+    vi.spyOn(repos.invites, 'get').mockRejectedValueOnce(new Error('dynamo exploded: table swint-secret'));
+    const res = await server.inject({ method: 'GET', url: '/join/some-token' });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' });
+    expect(res.body).not.toContain('dynamo exploded');
+    expect(logLines.join('')).toContain('dynamo exploded');
+    expect(logLines.join('')).not.toContain('some-token');
+    await close();
+  });
+
+  it('unknown routes return a generic 404 and never log the raw URL', async () => {
+    const logLines: string[] = [];
+    const { server, close } = await setup({ logLines });
+    const res = await server.inject({ method: 'GET', url: '/join/abcSecretInviteToken/def' });
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({ code: 'NOT_FOUND', message: 'Not found' });
+    expect(res.body).not.toContain('abcSecretInviteToken');
+    expect(logLines.length).toBeGreaterThan(0);
+    expect(logLines.join('')).toContain('/join/[redacted]/def');
+    expect(logLines.join('')).not.toContain('abcSecretInviteToken');
     await close();
   });
 
