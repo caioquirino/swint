@@ -27,8 +27,24 @@ interface OidcStateCookie {
   returnTo: string;
 }
 
+// Same-origin absolute path only: one leading '/', no '//' or '/\\' prefix, no backslashes,
+// no control characters (raw or percent-encoded CR/LF/etc.).
+const SAFE_RETURN_TO_PREFIX = /^\/(?![/\\])/;
+const ENCODED_UNSAFE = /%(?:[01][0-9a-f]|7f|5c)/i;
+
+const hasUnsafeChar = (value: string): boolean =>
+  [...value].some((ch) => {
+    const code = ch.charCodeAt(0);
+    return ch === '\\' || code <= 0x1f || code === 0x7f;
+  });
+
 const safeReturnTo = (value: unknown): string =>
-  typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/';
+  typeof value === 'string' &&
+  SAFE_RETURN_TO_PREFIX.test(value) &&
+  !hasUnsafeChar(value) &&
+  !ENCODED_UNSAFE.test(value)
+    ? value
+    : '/';
 
 export function registerAuthRoutes(app: FastifyInstance, deps: AuthRoutesDeps): void {
   const clearOpts = { path: '/' };
