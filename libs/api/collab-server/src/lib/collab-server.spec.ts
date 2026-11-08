@@ -13,8 +13,8 @@ afterEach(async () => {
   await kit?.close();
 });
 
-async function setup(status: 'created' | 'live' | 'ended' = 'live') {
-  kit = await startCollabTestKit({ debounceMs: 50, maxDebounceMs: 200 });
+async function setup(status: 'created' | 'live' | 'ended' = 'live', kitOpts: Parameters<typeof startCollabTestKit>[0] = {}) {
+  kit = await startCollabTestKit({ debounceMs: 50, maxDebounceMs: 200, ...kitOpts });
   const s = await seedSession(kit, { id: `s-${Math.random().toString(36).slice(2, 8)}`, status });
   kit.identities.set('ada', ada);
   kit.identities.set('bo', bo(s.id));
@@ -170,5 +170,51 @@ describe('collab server: persistence', () => {
       .poll(() => kit.stores.blobs.getBytes(blobKeys.sessionNotesLatest('default', s.id)), { timeout: 5000 })
       .not.toBeNull();
     n.destroy();
+  });
+
+  it('keeps the document loaded and dirty while S3 fails, and stores once it recovers', async () => {
+    const s = await setup('live', { sleep: async () => undefined, storeRetryMs: 50 });
+    kit.failPuts = true;
+    const name = docName.board(s.id);
+    const a = connectClient(kit, name, 'ada');
+    await a.synced;
+    getBoardElements(a.doc).set('e1', { id: 'e1', version: 1, versionNonce: 1, index: 'a0', isDeleted: false });
+    await expect.poll(() => kit.errors.length, { timeout: 5000 }).toBeGreaterThan(0);
+    expect(kit.errors[0]).toMatchObject({ sessionId: s.id });
+    a.destroy();
+    await new Promise((r) => setTimeout(r, 500));
+    expect(kit.collab.hocuspocus.documents.has(name)).toBe(true);
+    kit.failPuts = false;
+    await expect
+      .poll(
+        async () => {
+          const bytes = await kit.stores.blobs.getBytes(blobKeys.sessionBoardLatest('default', s.id));
+          if (!bytes) return undefined;
+          const d = new Y.Doc();
+          Y.applyUpdate(d, bytes);
+          return getBoardElements(d).get('e1')?.version;
+        },
+        { timeout: 5000 },
+      )
+      .toBe(1);
+  });
+
+  it('edits survive a server restart over the same stores', async () => {
+    const s = await setup('live');
+    const a = connectClient(kit, docName.board(s.id), 'ada');
+    await a.synced;
+    getBoardElements(a.doc).set('e1', { id: 'e1', version: 4, versionNonce: 1, index: 'a0', isDeleted: false });
+    await expect
+      .poll(async () => (await kit.stores.blobs.getBytes(blobKeys.sessionBoardLatest('default', s.id))) !== null, { timeout: 5000 })
+      .toBe(true);
+    a.destroy();
+    const stores = kit.stores;
+    await kit.close();
+    kit = await startCollabTestKit({ debounceMs: 50, maxDebounceMs: 200, stores });
+    kit.identities.set('ada', ada);
+    const b = connectClient(kit, docName.board(s.id), 'ada');
+    await b.synced;
+    expect(getBoardElements(b.doc).get('e1')).toMatchObject({ version: 4 });
+    b.destroy();
   });
 });

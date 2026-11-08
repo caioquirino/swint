@@ -15,22 +15,46 @@ export interface CollabTestKit {
   collab: CollabServer;
   /** Cookie header value → identity (fake resolver). */
   identities: Map<string, Identity>;
+  /** While true, every blob write through the collab server fails. */
+  failPuts: boolean;
+  /** Messages passed to the logger at error level. */
+  errors: object[];
   close(): Promise<void>;
 }
 
 const silentLogger: CollabLogger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined };
 
 export async function startCollabTestKit(
-  opts: Partial<Pick<CollabServerDeps, 'debounceMs' | 'maxDebounceMs' | 'checkpointIntervalMs'>> & { now?: () => number } = {},
+  opts: Partial<Pick<CollabServerDeps, 'debounceMs' | 'maxDebounceMs' | 'checkpointIntervalMs' | 'sleep' | 'storeRetryMs'>> & {
+    now?: () => number;
+    /** Reuse existing stores (simulates a server restart over the same table and bucket). */
+    stores?: TestStores;
+  } = {},
 ): Promise<CollabTestKit> {
-  const stores = await createTestStores();
+  const stores = opts.stores ?? (await createTestStores());
+  const errors: object[] = [];
+  const state = { failPuts: false };
+  const blobs = new Proxy(stores.blobs, {
+    get(target, prop, receiver) {
+      if (prop === 'putBytes') {
+        return async (...args: Parameters<typeof target.putBytes>) => {
+          if (state.failPuts) throw new Error('injected s3 failure');
+          return target.putBytes(...args);
+        };
+      }
+      const v = Reflect.get(target, prop, receiver);
+      return typeof v === 'function' ? v.bind(target) : v;
+    },
+  });
   const identities = new Map<string, Identity>();
   const collab = createCollabServer({
     sessions: stores.sessions,
-    blobs: stores.blobs,
+    blobs,
     resolveIdentity: async (h) => (h ? (identities.get(h) ?? null) : null),
     clock: { now: opts.now ?? Date.now },
-    logger: silentLogger,
+    logger: { ...silentLogger, error: (o) => void errors.push(o) },
+    sleep: opts.sleep,
+    storeRetryMs: opts.storeRetryMs,
     debounceMs: opts.debounceMs,
     maxDebounceMs: opts.maxDebounceMs,
     checkpointIntervalMs: opts.checkpointIntervalMs,
@@ -40,6 +64,13 @@ export async function startCollabTestKit(
   await new Promise<void>((r) => http.listen(0, '127.0.0.1', r));
   const { port } = http.address() as AddressInfo;
   return {
+    get failPuts() {
+      return state.failPuts;
+    },
+    set failPuts(v: boolean) {
+      state.failPuts = v;
+    },
+    errors,
     url: `ws://127.0.0.1:${port}/collab`,
     stores,
     collab,

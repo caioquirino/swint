@@ -25,6 +25,10 @@ export interface CollabServerDeps {
   maxDebounceMs?: number;
   /** Default 300000 (used from Task 5). */
   checkpointIntervalMs?: number;
+  /** Delay before retrying the store of an unsaved document whose last client left. Default 5000. */
+  storeRetryMs?: number;
+  /** Backoff sleep for S3 write retries; defaults to setTimeout. Tests inject a fast one. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface CollabServer {
@@ -46,9 +50,40 @@ const SHUTDOWN_MAX_MS = 5000;
 export function createCollabServer(deps: CollabServerDeps): CollabServer {
   const { logger } = deps;
   const handles: UpgradeHandle[] = [];
-  const docStore = createDocStore({ blobs: deps.blobs, logger });
+  const docStore = createDocStore({ blobs: deps.blobs, logger, sleep: deps.sleep });
   // lastContext can be absent when a store fires after the last connection left; remember the org per document.
   const orgByDocument = new Map<string, string>();
+  /** Documents whose last store failed; they must not be unloaded until a store succeeds. */
+  const unsaved = new Set<string>();
+  const retryTimers = new Map<string, NodeJS.Timeout>();
+
+  async function persist(document: Y.Doc, documentName: string, orgId: string | undefined): Promise<void> {
+    const target = targetOf(documentName);
+    if (!orgId) {
+      unsaved.add(documentName);
+      logger.error({ sessionId: target.sessionId }, 'collab: cannot store document, org unknown');
+      // Throw so Hocuspocus keeps the document dirty instead of treating this as stored.
+      throw new Error('collab: cannot store document, org unknown');
+    }
+    try {
+      await docStore.store(orgId, target, Y.encodeStateAsUpdate(document));
+      unsaved.delete(documentName);
+    } catch (err) {
+      unsaved.add(documentName);
+      logger.error({ sessionId: target.sessionId, err }, 'collab: storing document failed');
+      throw err; // Hocuspocus keeps the document dirty
+    }
+  }
+
+  function scheduleRetry(document: Y.Doc, documentName: string): void {
+    if (retryTimers.has(documentName)) return;
+    const timer = setTimeout(() => {
+      retryTimers.delete(documentName);
+      void hocuspocus.unloadDocument(document as never);
+    }, deps.storeRetryMs ?? 5000);
+    timer.unref();
+    retryTimers.set(documentName, timer);
+  }
 
   const hocuspocus = new Hocuspocus<CollabContext>({
     quiet: true,
@@ -90,29 +125,39 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
     },
 
     async onLoadDocument({ document, documentName, context }) {
-      const orgId = (context as CollabContext).identity.orgId;
+      const orgId = (context as CollabContext | undefined)?.identity?.orgId;
+      if (!orgId) {
+        logger.error({ sessionId: targetOf(documentName).sessionId }, 'collab: cannot load document, identity missing');
+        throw { reason: 'unauthenticated' };
+      }
       orgByDocument.set(documentName, orgId);
       const bytes = await docStore.load(orgId, targetOf(documentName));
       if (bytes) Y.applyUpdate(document, bytes);
     },
 
     async onStoreDocument({ document, documentName, lastContext }) {
-      const target = targetOf(documentName);
       const orgId = (lastContext as CollabContext | undefined)?.identity?.orgId ?? orgByDocument.get(documentName);
-      if (!orgId) {
-        logger.error({ sessionId: target.sessionId }, 'collab: cannot store document, org unknown');
-        return;
-      }
+      await persist(document, documentName, orgId);
+    },
+
+    // Hocuspocus unloads a document once its last client leaves, even if the last store failed, which
+    // would drop the edits. Keep unsaved documents in memory and retry until the store succeeds.
+    async beforeUnloadDocument({ document, documentName }) {
+      if (!unsaved.has(documentName)) return;
       try {
-        await docStore.store(orgId, target, Y.encodeStateAsUpdate(document));
+        await persist(document, documentName, orgByDocument.get(documentName));
       } catch (err) {
-        logger.error({ sessionId: target.sessionId, err }, 'collab: storing document failed');
-        throw err; // Hocuspocus keeps the document dirty
+        scheduleRetry(document, documentName);
+        throw err; // aborts the unload
       }
     },
 
     async afterUnloadDocument({ documentName }) {
       orgByDocument.delete(documentName);
+      unsaved.delete(documentName);
+      const t = retryTimers.get(documentName);
+      if (t) clearTimeout(t);
+      retryTimers.delete(documentName);
     },
 
     async onStateless({ documentName }) {
