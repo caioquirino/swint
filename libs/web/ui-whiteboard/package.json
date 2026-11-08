@@ -17,5 +17,9 @@
       "scope:web",
       "type:ui"
     ]
+  },
+  "dependencies": {
+    "@swint/shared-collab-protocol": "workspace:*",
+    "yjs": "^13.6.0"
   }
 }
