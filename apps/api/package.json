@@ -116,6 +116,13 @@
     "@orpc/openapi": "^1.16.2",
     "@orpc/zod": "^1.16.2",
     "zod": "^4.6.7",
-    "pino": "^10.4.0"
+    "pino": "^10.4.0",
+    "@swint/api-collab-server": "workspace:*"
+  },
+  "devDependencies": {
+    "@hocuspocus/provider": "^4.8.0",
+    "@swint/shared-collab-protocol": "workspace:*",
+    "ws": "^8.22.1",
+    "yjs": "^13.6.0"
   }
 }

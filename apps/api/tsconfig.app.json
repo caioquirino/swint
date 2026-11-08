@@ -27,11 +27,15 @@
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx",
     "src/test-env.d.ts",
+    "src/test/**",
     "eslint.config.js",
     "eslint.config.cjs",
     "eslint.config.mjs"
   ],
   "references": [
+    {
+      "path": "../../libs/api/collab-server/tsconfig.lib.json"
+    },
     {
       "path": "../../libs/shared/api-contract/tsconfig.lib.json"
     },
@@ -49,6 +53,9 @@
     },
     {
       "path": "../../libs/api/util-rpc/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/shared/collab-protocol/tsconfig.lib.json"
     }
   ]
 }

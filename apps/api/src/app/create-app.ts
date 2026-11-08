@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { DestinationStream } from 'pino';
 import {
   createAuthSessionsRepo,
@@ -27,7 +27,8 @@ import {
   type CookieHeaderIdentityResolver,
   type OidcClient,
 } from '@swint/api-feature-auth';
-import { noopSessionEvents, type SessionEvents } from '@swint/api-feature-sessions';
+import { createCollabServer, type CollabLogger, type CollabServer } from '@swint/api-collab-server';
+import type { SessionEvents } from '@swint/api-feature-sessions';
 import { randomToken, systemClock, ulidIds } from '@swint/api-util-rpc';
 import type { AppConfig } from './config.js';
 import { buildRouter } from './router.js';
@@ -47,7 +48,39 @@ export interface App {
   repos: AppRepos;
   /** Resolves an identity from a raw Cookie header (e.g. a WebSocket upgrade request). */
   resolveIdentityFromCookieHeader: CookieHeaderIdentityResolver;
+  /** Real-time collaboration server, attached to `server` at `/collab`. */
+  collab: CollabServer;
+  /** Flushes collab documents to S3, then closes HTTP, then the AWS clients. */
   close(): Promise<void>;
+}
+
+/** A `SessionEvents` that never rejects: calls each defined implementation in order, logging failures. */
+export function composeEvents(
+  logger: Pick<FastifyBaseLogger, 'error'>,
+  ...list: (SessionEvents | undefined)[]
+): SessionEvents {
+  const impls = list.filter((e): e is SessionEvents => e !== undefined);
+  return {
+    async sessionChanged(rec) {
+      for (const impl of impls) {
+        try {
+          await impl.sessionChanged(rec);
+        } catch (err) {
+          logger.error({ err, sessionId: rec.id }, 'session event handler failed');
+        }
+      }
+    },
+  };
+}
+
+/** Adapts a pino/Fastify logger to the collab server's logger interface. */
+function collabLogger(log: FastifyBaseLogger): CollabLogger {
+  return {
+    debug: (o, m) => log.debug(o, m),
+    info: (o, m) => log.info(o, m),
+    warn: (o, m) => log.warn(o, m),
+    error: (o, m) => log.error(o, m),
+  };
 }
 
 export async function createApp(
@@ -88,13 +121,23 @@ export async function createApp(
       allowInsecureHttp: config.oidcIssuer.startsWith('http://'),
     });
 
+  // The collab server needs the Fastify logger, which only exists after buildServer; the router gets a
+  // forwarding SessionEvents whose target is set as soon as collab exists (before the server is ready).
+  const eventsTarget: { current?: SessionEvents } = {};
+  const forwardingEvents: SessionEvents = {
+    sessionChanged: async (rec) => {
+      await eventsTarget.current?.sessionChanged(rec);
+    },
+  };
+  const resolveIdentityFromCookieHeader = createCookieIdentityResolver({ ...repos, clock, cookieSecret: config.cookieSecret });
+
   const router = buildRouter({
     ...repos,
     clock,
     newId: ulidIds,
     newToken: randomToken,
     publicBaseUrl: config.publicBaseUrl,
-    events: overrides.events ?? noopSessionEvents,
+    events: forwardingEvents,
   });
 
   const server = await buildServer({
@@ -115,13 +158,26 @@ export async function createApp(
       registerJoinRoute(app, { invites: repos.invites, sessions: repos.sessions, clock, secureCookies });
     },
   });
+  const collab = createCollabServer({
+    sessions: repos.sessions,
+    blobs: repos.blobs,
+    resolveIdentity: resolveIdentityFromCookieHeader,
+    clock,
+    logger: collabLogger(server.log.child({ component: 'collab' })),
+  });
+  eventsTarget.current = composeEvents(server.log, collab.events, overrides.events);
+  // The upgrade listener must exist before listen().
+  collab.attach(server.server);
   await server.ready();
 
   return {
     server,
     repos,
-    resolveIdentityFromCookieHeader: createCookieIdentityResolver({ ...repos, clock, cookieSecret: config.cookieSecret }),
+    resolveIdentityFromCookieHeader,
+    collab,
     close: async () => {
+      // Flush collab documents while S3 is still reachable (bounded by collab's own shutdown deadline).
+      await collab.close();
       await server.close();
       raw.destroy();
       s3.destroy();

@@ -71,10 +71,10 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
   const handler = new OpenAPIHandler(deps.router, {
     interceptors: [
-      onError((error) => {
+      onError((error, { context }) => {
         // Expected 4xx ORPCErrors (auth, validation, not found, conflicts) are not worth logging.
         if (!(error instanceof ORPCError) || error.status >= 500) {
-          app.log.error({ err: error }, 'rpc error');
+          app.log.error({ err: error, requestId: context.requestId }, 'rpc error');
         }
       }),
     ],

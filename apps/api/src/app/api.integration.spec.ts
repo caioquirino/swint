@@ -1,68 +1,11 @@
-import { describe, expect, inject, it, vi } from 'vitest';
-import { randomUUID } from 'node:crypto';
-import '@swint/api-data-access-persistence/testing'; // ProvidedContext typings for inject()
-import { sha256Hex } from '@swint/api-util-rpc';
-import type { OidcClient } from '@swint/api-feature-auth';
+import { describe, expect, it, vi } from 'vitest';
 import { COOKIE } from '@swint/api-feature-auth';
-import { createApp } from './create-app.js';
-import { loadConfig } from './config.js';
-
-const fakeOidc: OidcClient = {
-  createAuthorization: async () => ({ url: new URL('http://idp.test/auth'), state: 's', verifier: 'v' }),
-  exchange: async () => {
-    throw new Error('not used');
-  },
-  endSessionUrl: async () => new URL('http://idp.test/logout'),
-};
+import { setup, templateBody } from '../test/app-test-setup.js';
 
 function defined<T>(value: T | undefined, what: string): T {
   if (value === undefined) throw new Error(`expected ${what} to be defined`);
   return value;
 }
-
-async function setup(opts: { logLines?: string[] } = {}) {
-  const suffix = randomUUID().slice(0, 8);
-  const config = loadConfig({
-    NODE_ENV: 'test',
-    DYNAMODB_ENDPOINT: inject('dynamoEndpoint'),
-    S3_ENDPOINT: inject('s3Endpoint'),
-    TABLE_NAME: `swint-it-${suffix}`,
-    BUCKET_NAME: `swint-it-${suffix}`,
-    LOG_LEVEL: opts.logLines ? 'trace' : 'silent',
-  });
-  const logLines = opts.logLines;
-  const app = await createApp(config, {
-    oidc: fakeOidc,
-    ...(logLines ? { logStream: { write: (line: string) => void logLines.push(line) } } : {}),
-  });
-  const server = app.server;
-  const repos = app.repos; // exposed for tests (see create-app)
-
-  async function interviewerCookie(sub = 'sub-1', orgId = 'default', roles = ['interviewer']) {
-    const sid = `sid-${sub}-${orgId}`;
-    await repos.authSessions.create({
-      idHash: sha256Hex(sid),
-      userSub: sub,
-      orgId,
-      name: `User ${sub}`,
-      email: null,
-      roles,
-      idToken: 'jwt',
-      expiresAt: Math.floor(Date.now() / 1000) + 3600,
-    });
-    return { [COOKIE.session]: server.signCookie(sid) };
-  }
-
-  return {
-    server,
-    repos,
-    interviewerCookie,
-    resolveIdentityFromCookieHeader: app.resolveIdentityFromCookieHeader,
-    close: app.close,
-  };
-}
-
-const templateBody = { title: 'URL shortener', instructionsMd: '# Go', rubricMd: '- scaling', durationMin: 45, boardSeed: null };
 
 describe('API over HTTP', () => {
   it('healthz and openapi.json', async () => {
@@ -232,6 +175,21 @@ describe('API over HTTP', () => {
     expect(res.body).not.toContain('dynamo exploded');
     expect(logLines.join('')).toContain('dynamo exploded');
     expect(logLines.join('')).not.toContain('some-token');
+    await close();
+  });
+
+  it('unexpected rpc errors are logged with the request id', async () => {
+    const logLines: string[] = [];
+    const { server, repos, interviewerCookie, close } = await setup({ logLines });
+    const ic = await interviewerCookie();
+    vi.spyOn(repos.templates, 'listByOrg').mockRejectedValueOnce(new Error('dynamo exploded'));
+    const res = await server.inject({ method: 'GET', url: '/api/templates', cookies: ic });
+    expect(res.statusCode).toBe(500);
+    const entries = logLines.map((l) => JSON.parse(l) as Record<string, unknown>);
+    const incoming = entries.find((e) => e.msg === 'incoming request' && (e.req as { url?: string })?.url === '/api/templates');
+    const rpcError = entries.find((e) => e.msg === 'rpc error');
+    expect(incoming?.reqId).toEqual(expect.any(String));
+    expect(rpcError).toMatchObject({ requestId: incoming?.reqId });
     await close();
   });
 
