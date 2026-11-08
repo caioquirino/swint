@@ -56,6 +56,9 @@
     },
     {
       "path": "./libs/web/feature-template-editor"
+    },
+    {
+      "path": "./libs/web/feature-session-room"
     }
   ]
 }
