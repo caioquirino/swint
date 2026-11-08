@@ -1,19 +1,17 @@
 import type { Server } from 'node:http';
 import { Hocuspocus } from '@hocuspocus/server';
+import * as Y from 'yjs';
 import type { BlobStore, SessionRecord, SessionsRepo } from '@swint/api-data-access-persistence';
 import type { CookieHeaderIdentityResolver } from '@swint/api-feature-auth';
 import { noopSessionEvents, type SessionEvents } from '@swint/api-feature-sessions';
 import type { Clock, Identity } from '@swint/api-util-rpc';
 import { CollabAccessError, authorizeDocument, targetOf, type DocTarget } from './access.js';
+import { createDocStore } from './doc-store.js';
+import type { CollabContext, CollabLogger } from './types.js';
 import { sessionStateMessage } from './session-state.js';
 import { attachUpgradeHandler, type UpgradeHandle } from './upgrade.js';
 
-export interface CollabLogger {
-  debug(o: object, m?: string): void;
-  info(o: object, m?: string): void;
-  warn(o: object, m?: string): void;
-  error(o: object, m?: string): void;
-}
+export type { CollabContext, CollabLogger } from './types.js';
 
 export interface CollabServerDeps {
   sessions: SessionsRepo;
@@ -27,10 +25,6 @@ export interface CollabServerDeps {
   maxDebounceMs?: number;
   /** Default 300000 (used from Task 5). */
   checkpointIntervalMs?: number;
-}
-
-export interface CollabContext {
-  identity: Identity;
 }
 
 export interface CollabServer {
@@ -52,6 +46,9 @@ const SHUTDOWN_MAX_MS = 5000;
 export function createCollabServer(deps: CollabServerDeps): CollabServer {
   const { logger } = deps;
   const handles: UpgradeHandle[] = [];
+  const docStore = createDocStore({ blobs: deps.blobs, logger });
+  // lastContext can be absent when a store fires after the last connection left; remember the org per document.
+  const orgByDocument = new Map<string, string>();
 
   const hocuspocus = new Hocuspocus<CollabContext>({
     quiet: true,
@@ -92,12 +89,30 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       }
     },
 
-    async onLoadDocument() {
-      // Persistence lands in Task 4.
+    async onLoadDocument({ document, documentName, context }) {
+      const orgId = (context as CollabContext).identity.orgId;
+      orgByDocument.set(documentName, orgId);
+      const bytes = await docStore.load(orgId, targetOf(documentName));
+      if (bytes) Y.applyUpdate(document, bytes);
     },
 
-    async onStoreDocument() {
-      // Persistence lands in Task 4.
+    async onStoreDocument({ document, documentName, lastContext }) {
+      const target = targetOf(documentName);
+      const orgId = (lastContext as CollabContext | undefined)?.identity?.orgId ?? orgByDocument.get(documentName);
+      if (!orgId) {
+        logger.error({ sessionId: target.sessionId }, 'collab: cannot store document, org unknown');
+        return;
+      }
+      try {
+        await docStore.store(orgId, target, Y.encodeStateAsUpdate(document));
+      } catch (err) {
+        logger.error({ sessionId: target.sessionId, err }, 'collab: storing document failed');
+        throw err; // Hocuspocus keeps the document dirty
+      }
+    },
+
+    async afterUnloadDocument({ documentName }) {
+      orgByDocument.delete(documentName);
     },
 
     async onStateless({ documentName }) {

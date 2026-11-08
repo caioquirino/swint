@@ -249,6 +249,9 @@ importers:
       ws:
         specifier: ^8.22.1
         version: 8.22.1
+      yjs:
+        specifier: ^13.6.0
+        version: 13.6.33
 
   libs/api/data-access-persistence:
     dependencies:

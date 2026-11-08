@@ -31,6 +31,7 @@
     "@swint/shared-collab-protocol": "workspace:*",
     "@swint/shared-domain": "workspace:*",
     "tslib": "^2.3.0",
-    "ws": "^8.22.1"
+    "ws": "^8.22.1",
+    "yjs": "^13.6.0"
   }
 }

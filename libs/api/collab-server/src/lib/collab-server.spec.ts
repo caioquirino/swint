@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import * as Y from 'yjs';
+import { blobKeys } from '@swint/api-data-access-persistence';
 import { getBoardElements, parseServerMessage, docName } from '@swint/shared-collab-protocol';
 import type { Identity } from '@swint/api-util-rpc';
 import { connectClient, seedSession, startCollabTestKit, type CollabTestKit } from '../testing/collab-test-kit.js';
@@ -116,5 +118,57 @@ describe('collab server: sync and session.state', () => {
     expect(a.stateless.length).toBe(before);
     a.destroy();
     b.destroy();
+  });
+});
+
+describe('collab server: persistence', () => {
+  it('loads the board seeded at session creation (latest.bin)', async () => {
+    const s = await setup('live');
+    const seed = new Y.Doc();
+    getBoardElements(seed).set('seed1', { id: 'seed1', version: 2, versionNonce: 3, index: 'a0', isDeleted: false });
+    await kit.stores.blobs.putBytes(blobKeys.sessionBoardLatest('default', s.id), Y.encodeStateAsUpdate(seed));
+    const a = connectClient(kit, docName.board(s.id), 'ada');
+    await a.synced;
+    expect(getBoardElements(a.doc).get('seed1')).toMatchObject({ version: 2 });
+    a.destroy();
+  });
+
+  it('a session without latest.bin opens as an empty board', async () => {
+    const s = await setup('live');
+    const a = connectClient(kit, docName.board(s.id), 'ada');
+    await a.synced;
+    expect(getBoardElements(a.doc).size).toBe(0);
+    a.destroy();
+  });
+
+  it('edits are stored (debounced) under the board key', async () => {
+    const s = await setup('live');
+    const a = connectClient(kit, docName.board(s.id), 'ada');
+    await a.synced;
+    getBoardElements(a.doc).set('e1', { id: 'e1', version: 1, versionNonce: 1, index: 'a0', isDeleted: false });
+    await expect
+      .poll(
+        async () => {
+          const bytes = await kit.stores.blobs.getBytes(blobKeys.sessionBoardLatest('default', s.id));
+          if (!bytes) return undefined;
+          const d = new Y.Doc();
+          Y.applyUpdate(d, bytes);
+          return getBoardElements(d).get('e1')?.version;
+        },
+        { timeout: 5000 },
+      )
+      .toBe(1);
+    a.destroy();
+  });
+
+  it('notes are persisted under the notes key', async () => {
+    const s = await setup('live');
+    const n = connectClient(kit, docName.notes(s.id), 'ada');
+    await n.synced;
+    n.doc.getXmlFragment('content').insert(0, [new Y.XmlText('hello')]);
+    await expect
+      .poll(() => kit.stores.blobs.getBytes(blobKeys.sessionNotesLatest('default', s.id)), { timeout: 5000 })
+      .not.toBeNull();
+    n.destroy();
   });
 });
