@@ -24,6 +24,12 @@
       "path": "../util-rpc/tsconfig.lib.json"
     },
     {
+      "path": "../feature-sessions/tsconfig.lib.json"
+    },
+    {
+      "path": "../feature-auth/tsconfig.lib.json"
+    },
+    {
       "path": "../data-access-persistence/tsconfig.lib.json"
     }
   ],
