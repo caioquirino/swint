@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AWARENESS_USER_FIELD, candidateUserId, colorForUser } from '@swint/shared-collab-protocol';
 import { CollabFactoryProvider, initialConnState, type CollabPhase } from '@swint/web-data-access-collab';
@@ -52,9 +52,9 @@ describe('LiveRoom (candidate)', () => {
   it('edits the board and announces itself with the server-consistent identity', async () => {
     const { fake } = renderLive(candidateView);
     expect(await screen.findByTestId('board')).toHaveAttribute('data-readonly', 'false');
-    expect(fake.session.board.awareness.getLocalState()?.[AWARENESS_USER_FIELD]).toEqual({
+    await waitFor(() => expect(fake.session.board.awareness.getLocalState()?.[AWARENESS_USER_FIELD]).toEqual({
       userId: candidateUserId('s1'), name: 'Bo', role: 'candidate', color: colorForUser(candidateUserId('s1')), selectedElementIds: {},
-    });
+    }));
     expect(screen.queryByRole('tab', { name: 'Notes' })).not.toBeInTheDocument();
   });
 
@@ -62,19 +62,19 @@ describe('LiveRoom (candidate)', () => {
     const { fake } = renderLive(candidateView);
     await screen.findByTestId('board');
     act(() => fake.update({ sessionState: stateMsg('ended') }));
-    expect(screen.getByRole('heading', { name: 'The interview has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'The interview has ended' })).toBeInTheDocument();
   });
 
   it('4403 session_ended → ended screen; invite_revoked → invalid link screen', async () => {
     const a = renderLive(candidateView);
     await screen.findByTestId('board');
     act(() => a.fake.update(phase({ kind: 'closed', reason: 'session_ended' })));
-    expect(screen.getByRole('heading', { name: 'The interview has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'The interview has ended' })).toBeInTheDocument();
     a.unmount();
     const b = renderLive(candidateView);
     await screen.findByTestId('board');
     act(() => b.fake.update(phase({ kind: 'closed', reason: 'invite_revoked' })));
-    expect(screen.getByRole('heading', { name: 'This link is no longer valid' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'This link is no longer valid' })).toBeInTheDocument();
   });
 
   it('when the socket is unreachable, probes REST and follows its verdict', async () => {
@@ -98,9 +98,9 @@ describe('LiveRoom (candidate)', () => {
     const { fake } = renderLive(candidateView);
     await screen.findByTestId('board');
     act(() => fake.update(phase({ kind: 'reconnecting' })));
-    expect(screen.getByRole('status')).toHaveTextContent(/reconnecting/i);
+    expect(await screen.findByRole('status')).toHaveTextContent(/reconnecting/i);
     act(() => fake.update(phase({ kind: 'connected' })));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
   });
 });
 
@@ -113,7 +113,7 @@ describe('LiveRoom (interviewer)', () => {
     expect(screen.queryByRole('button', { name: /export png/i })).not.toBeInTheDocument();
 
     act(() => fake.update({ sessionState: stateMsg('ended') }));
-    expect(screen.getByTestId('board')).toHaveAttribute('data-readonly', 'true');
+    await waitFor(() => expect(screen.getByTestId('board')).toHaveAttribute('data-readonly', 'true'));
     expect(screen.getByTestId('notes')).toHaveAttribute('data-readonly', 'true');
     expect(screen.queryByRole('button', { name: 'End interview' })).not.toBeInTheDocument();
     expect(screen.getByRole('timer')).toHaveAttribute('data-phase', 'ended');
@@ -127,6 +127,19 @@ describe('LiveRoom (interviewer)', () => {
     const { fake } = renderLive(interviewerView);
     await screen.findByTestId('board');
     act(() => fake.update({ conn: { ...initialConnState, phase: { kind: 'connected' }, everConnected: true, readOnly: true } }));
+    await waitFor(() => expect(screen.getByTestId('board')).toHaveAttribute('data-readonly', 'true'));
+  });
+
+  it('4403 session_ended: read-only at once, then REST confirms ended and export appears', async () => {
+    let resolveSecond: (v: unknown) => void = () => undefined;
+    const get = vi.fn().mockResolvedValueOnce(interviewerView).mockReturnValueOnce(new Promise((r) => { resolveSecond = r; }));
+    const { fake } = renderLive(interviewerView, get);
+    await screen.findByTestId('board');
+    act(() => fake.update(phase({ kind: 'closed', reason: 'session_ended' })));
+    await waitFor(() => expect(screen.getByTestId('board')).toHaveAttribute('data-readonly', 'true'));
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+    await act(async () => resolveSecond({ ...interviewerView, status: 'ended' }));
+    expect(await screen.findByRole('button', { name: /export png/i })).toBeInTheDocument();
     expect(screen.getByTestId('board')).toHaveAttribute('data-readonly', 'true');
   });
 });

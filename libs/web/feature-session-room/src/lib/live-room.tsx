@@ -36,8 +36,9 @@ export function LiveRoom({ view }: { view: RoomView }) {
   const phase = snapshot?.conn.phase;
   const finished = isFinished(state.status);
   const interviewer = view.role === 'interviewer';
-  const readOnly = interviewer ? finished || Boolean(snapshot?.conn.readOnly) : finished;
   const terminalReason = phase && (phase.kind === 'rejected' || phase.kind === 'closed') ? phase.reason : null;
+  // An interviewer whose socket was closed with session_ended is read-only until REST confirms the end.
+  const readOnly = interviewer ? finished || terminalReason === 'session_ended' || Boolean(snapshot?.conn.readOnly) : finished;
 
   // Announce ourselves. The server re-stamps identity fields anyway (spec §7.3).
   useEffect(() => {
