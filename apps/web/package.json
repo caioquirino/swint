@@ -1,0 +1,14 @@
+{
+  "name": "web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "tags": [
+      "scope:web"
+    ]
+  },
+  "dependencies": {
+    "@swint/web-ui-primitives": "workspace:*"
+  }
+}

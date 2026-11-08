@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+/* Tailwind v4 only scans the app by default; the UI lives in the web libs. */
+@source '../../../libs/web';
+
+html, body, #root { height: 100%; }
+body { @apply bg-slate-50 text-slate-900 antialiased; }
