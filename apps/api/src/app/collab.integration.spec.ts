@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import WebSocket from 'ws';
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider';
 import { docName, getBoardElements, parseServerMessage } from '@swint/shared-collab-protocol';
-import { blobKeys } from '@swint/api-data-access-persistence';
+import { blobKeys, createBlobStore, createS3 } from '@swint/api-data-access-persistence';
 import { COOKIE } from '@swint/api-feature-auth';
 import { setup, templateBody, type TestApp } from '../test/app-test-setup.js';
 
@@ -132,7 +132,7 @@ describe('collab over the real API server', () => {
     const c = connect(t.port, docName.board(id), cookieHeader({ [COOKIE.candidate]: cand?.value ?? '' }));
     await c.synced;
     expect((await t.server.inject({ method: 'POST', url: `/api/sessions/${id}/end`, cookies: ic })).statusCode).toBe(200);
-    await expect(c.closed).resolves.toBeDefined();
+    await expect(c.closed).resolves.toMatchObject({ code: 4403, reason: 'session_ended' });
     c.destroy();
   });
 
@@ -169,22 +169,43 @@ describe('collab over the real API server', () => {
     expect((await t.server.inject({ method: 'GET', url: '/healthz' })).json()).toEqual({ ok: true });
   });
 
-  it('app.close() flushes pending board changes to S3', async () => {
+  it('app.close() flushes pending board changes to S3 while the client is still connected', async () => {
     t = await setup({ listen: true });
     const { id, ic } = await liveSession(t);
-    const a = connect(t.port, docName.board(id), cookieHeader(ic));
+    const name = docName.board(id);
+    const a = connect(t.port, name, cookieHeader(ic));
     await a.synced;
     getBoardElements(a.doc).set('flushed', { id: 'flushed', version: 1, versionNonce: 1, index: 'a0', isDeleted: false });
-    await new Promise((r) => setTimeout(r, 100)); // let the update reach the server, well below the 2 s debounce
-    const blobs = t.repos.blobs;
+    // The edit is in the server's document (well below the 2 s store debounce, so nothing is stored yet).
+    const server = t.collab.hocuspocus.documents.get(name);
+    await expect.poll(() => (server ? getBoardElements(server).get('flushed') : undefined)).toMatchObject({ version: 1 });
+    const { config } = t;
     const app = t;
     t = undefined;
-    a.destroy();
-    await app.close();
-    const bytes = await blobs.getBytes(blobKeys.sessionBoardLatest('default', id));
-    expect(bytes).not.toBeNull();
-    const d = new Y.Doc();
-    Y.applyUpdate(d, bytes as Uint8Array);
-    expect(getBoardElements(d).get('flushed')).toMatchObject({ version: 1 });
+    try {
+      await app.close(); // the client is still connected
+    } finally {
+      a.destroy();
+    }
+    const s3 = createS3({ region: config.awsRegion, s3Endpoint: config.s3Endpoint, credentials: config.awsCredentials });
+    try {
+      const bytes = await createBlobStore(s3, config.bucketName).getBytes(blobKeys.sessionBoardLatest('default', id));
+      expect(bytes).not.toBeNull();
+      const d = new Y.Doc();
+      Y.applyUpdate(d, bytes as Uint8Array);
+      expect(getBoardElements(d).get('flushed')).toMatchObject({ version: 1 });
+    } finally {
+      s3.destroy();
+    }
+  });
+
+  it('app.close() still closes the HTTP server when the collab shutdown fails', async () => {
+    t = await setup({ listen: true });
+    const app = t;
+    t = undefined;
+    vi.spyOn(app.collab, 'close').mockRejectedValueOnce(new Error('collab shutdown failed'));
+    await expect(app.close()).rejects.toThrow('collab shutdown failed');
+    expect(app.server.server.listening).toBe(false);
+    await app.collab.close(); // the real shutdown, so nothing is left behind
   });
 });

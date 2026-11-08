@@ -33,6 +33,7 @@ export interface TestApp {
   port: number;
   interviewerCookie(sub?: string, orgId?: string, roles?: string[]): Promise<Record<string, string>>;
   resolveIdentityFromCookieHeader: App['resolveIdentityFromCookieHeader'];
+  collab: App['collab'];
   close(): Promise<void>;
 }
 
@@ -82,6 +83,7 @@ export async function setup(opts: { logLines?: string[]; listen?: boolean } = {}
     port,
     interviewerCookie,
     resolveIdentityFromCookieHeader: app.resolveIdentityFromCookieHeader,
+    collab: app.collab,
     close: app.close,
   };
 }

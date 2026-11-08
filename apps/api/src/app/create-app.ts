@@ -177,10 +177,17 @@ export async function createApp(
     collab,
     close: async () => {
       // Flush collab documents while S3 is still reachable (bounded by collab's own shutdown deadline).
-      await collab.close();
-      await server.close();
-      raw.destroy();
-      s3.destroy();
+      // HTTP and the AWS clients are closed even if an earlier step fails.
+      try {
+        await collab.close();
+      } finally {
+        try {
+          await server.close();
+        } finally {
+          raw.destroy();
+          s3.destroy();
+        }
+      }
     },
   };
 }
