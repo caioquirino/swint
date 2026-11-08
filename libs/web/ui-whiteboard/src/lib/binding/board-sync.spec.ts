@@ -176,4 +176,29 @@ describe('BoardSync', () => {
     // 2 pushes; plus one write-back in the order where Yjs picked the loser.
     expect(localUpdates.slice().sort()).toEqual([2, 3]);
   });
+
+  it('detects in-place mutation of a previously pushed element', () => {
+    const { flush, syncA, syncB } = setup();
+    const e = el('e', 1, 10);
+    syncA.pushLocal([e]);
+    flush();
+    e.version = 2;
+    e.versionNonce = 99;
+    e['x'] = 42;
+    syncA.pushLocal([e]);
+    flush();
+    expect(syncB.getElements().map((x) => [x.version, x.versionNonce, x['x']])).toEqual([[2, 99, 42]]);
+  });
+
+  it('does not expose internal state through returned or delivered elements', () => {
+    const { a, flush, syncA, syncB, onB } = setup();
+    syncA.pushLocal([el('e', 1, 10)]);
+    flush();
+    const received = onB.mock.calls[0][0][0] as SyncedElement;
+    received['x'] = 777;
+    syncB.getElements()[0]['x'] = 888;
+    expect(syncB.getElements()[0]['x']).toBe(0);
+    expect(getBoardElements(a).get('e')?.['x']).toBe(0);
+    expect(getBoardElements(a).get('e')).not.toBe(received);
+  });
 });
