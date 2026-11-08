@@ -99,5 +99,19 @@
       "scope:api"
     ]
   },
-  "dependencies": {}
+  "dependencies": {
+    "@swint/api-util-rpc": "workspace:*",
+    "@swint/api-data-access-persistence": "workspace:*",
+    "@swint/api-feature-auth": "workspace:*",
+    "@swint/api-feature-templates": "workspace:*",
+    "@swint/api-feature-sessions": "workspace:*",
+    "@swint/shared-api-contract": "workspace:*",
+    "fastify": "^5.12.8",
+    "@fastify/cookie": "^11.1.5",
+    "@orpc/server": "^1.16.2",
+    "@orpc/openapi": "^1.16.2",
+    "@orpc/zod": "^1.16.2",
+    "zod": "^4.6.7",
+    "pino": "^10.4.0"
+  }
 }

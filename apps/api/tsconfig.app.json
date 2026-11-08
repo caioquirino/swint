@@ -1,12 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
+    "outDir": "out-tsc/app",
     "types": [
       "node"
     ],
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
+    "tsBuildInfoFile": "out-tsc/app/tsconfig.app.tsbuildinfo"
   },
   "include": [
     "src/**/*.ts"
@@ -26,8 +26,29 @@
     "src/**/*.spec.js",
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx",
+    "src/test-env.d.ts",
     "eslint.config.js",
     "eslint.config.cjs",
     "eslint.config.mjs"
+  ],
+  "references": [
+    {
+      "path": "../../libs/shared/api-contract/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/api/feature-sessions/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/api/feature-templates/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/api/feature-auth/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/api/data-access-persistence/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/api/util-rpc/tsconfig.lib.json"
+    }
   ]
 }
