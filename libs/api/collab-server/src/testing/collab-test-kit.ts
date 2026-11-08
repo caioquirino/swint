@@ -4,7 +4,7 @@ import WebSocket from 'ws';
 import * as Y from 'yjs';
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider';
 import type { Identity } from '@swint/api-util-rpc';
-import type { SessionRecord } from '@swint/api-data-access-persistence';
+import type { SessionRecord, SessionsRepo } from '@swint/api-data-access-persistence';
 import { createTestStores, type TestStores } from '@swint/api-data-access-persistence/testing';
 import type { SessionStatus } from '@swint/shared-domain';
 import { createCollabServer, type CollabLogger, type CollabServer, type CollabServerDeps } from '../lib/collab-server.js';
@@ -23,6 +23,12 @@ export interface CollabTestKit {
   putCalls: number;
   /** Messages passed to the logger at error level. */
   errors: object[];
+  /** While true, every `sessions.get` through the collab server throws (e.g. DynamoDB down). */
+  failSessionGets: boolean;
+  /** Runs after each `sessions.get` through the collab server reads the record, before it is returned. */
+  afterSessionGet: ((rec: SessionRecord | null) => Promise<void>) | null;
+  /** Number of distinct board checkpoints (by key, so retries of one write count once) attempted for a session. */
+  checkpointsWritten(sessionId: string): number;
   close(): Promise<void>;
 }
 
@@ -37,12 +43,22 @@ export async function startCollabTestKit(
 ): Promise<CollabTestKit> {
   const stores = opts.stores ?? (await createTestStores());
   const errors: object[] = [];
-  const state = { failPuts: false, hangPuts: false, putCalls: 0 };
+  const state = {
+    failPuts: false,
+    hangPuts: false,
+    putCalls: 0,
+    failSessionGets: false,
+    afterSessionGet: null as CollabTestKit['afterSessionGet'],
+  };
+  const checkpoints = new Map<string, Set<string>>();
+  const checkpointKey = /\/sessions\/([^/]+)\/board\/checkpoints\//;
   const blobs = new Proxy(stores.blobs, {
     get(target, prop, receiver) {
       if (prop === 'putBytes') {
         return async (...args: Parameters<typeof target.putBytes>) => {
           state.putCalls++;
+          const m = checkpointKey.exec(args[0]);
+          if (m) checkpoints.set(m[1], (checkpoints.get(m[1]) ?? new Set()).add(args[0]));
           if (state.hangPuts) return new Promise<void>(() => undefined);
           if (state.failPuts) throw new Error('injected s3 failure');
           return target.putBytes(...args);
@@ -52,9 +68,18 @@ export async function startCollabTestKit(
       return typeof v === 'function' ? v.bind(target) : v;
     },
   });
+  const sessions: SessionsRepo = {
+    ...stores.sessions,
+    async get(orgId, id) {
+      if (state.failSessionGets) throw new Error('injected dynamodb failure');
+      const rec = await stores.sessions.get(orgId, id);
+      await state.afterSessionGet?.(rec);
+      return rec;
+    },
+  };
   const identities = new Map<string, Identity>();
   const collab = createCollabServer({
-    sessions: stores.sessions,
+    sessions,
     blobs,
     resolveIdentity: async (h) => (h ? (identities.get(h) ?? null) : null),
     clock: { now: opts.now ?? Date.now },
@@ -86,6 +111,19 @@ export async function startCollabTestKit(
     set hangPuts(v: boolean) {
       state.hangPuts = v;
     },
+    get failSessionGets() {
+      return state.failSessionGets;
+    },
+    set failSessionGets(v: boolean) {
+      state.failSessionGets = v;
+    },
+    get afterSessionGet() {
+      return state.afterSessionGet;
+    },
+    set afterSessionGet(v: CollabTestKit['afterSessionGet']) {
+      state.afterSessionGet = v;
+    },
+    checkpointsWritten: (sessionId) => checkpoints.get(sessionId)?.size ?? 0,
     errors,
     url: `ws://127.0.0.1:${port}/collab`,
     stores,
