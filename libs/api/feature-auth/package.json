@@ -28,6 +28,7 @@
     "@swint/api-data-access-persistence": "workspace:*",
     "@swint/shared-domain": "workspace:*",
     "fastify": "^5.12.8",
-    "@fastify/cookie": "^11.1.5"
+    "@fastify/cookie": "^11.1.5",
+    "openid-client": "^6.8.9"
   }
 }
