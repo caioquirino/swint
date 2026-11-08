@@ -13,6 +13,7 @@ export default defineConfig(() => ({
         'name': 'web-ui-whiteboard',
         'watch': false,
         passWithNoTests: true,
+        setupFiles: ['./src/test-setup.ts'],
         'globals': true,
         'environment': "jsdom",
         'include': ["src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],

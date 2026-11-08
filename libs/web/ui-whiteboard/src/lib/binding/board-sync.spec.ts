@@ -9,7 +9,9 @@ const el = (
   version: number,
   versionNonce: number,
   extra: Partial<SyncedElement> = {},
-): SyncedElement => ({ id, version, versionNonce, index: 'a0', isDeleted: false, x: 0, ...extra });
+): SyncedElement => ({
+  id, type: 'rectangle', version, versionNonce, index: 'a0', isDeleted: false, x: 0, y: 0, width: 10, height: 10, ...extra,
+});
 
 function setup(clientIds: number[] = [1, 2]) {
   const { a, b, flush } = createPeers({ clientIds });
@@ -190,15 +192,69 @@ describe('BoardSync', () => {
     expect(syncB.getElements().map((x) => [x.version, x.versionNonce, x['x']])).toEqual([[2, 99, 42]]);
   });
 
-  it('does not expose internal state through returned or delivered elements', () => {
-    const { a, flush, syncA, syncB, onB } = setup();
-    syncA.pushLocal([el('e', 1, 10)]);
+  it('does not expose internal state: mutating delivered elements changes neither BoardSync nor the receiver Y.Map', () => {
+    const { b, flush, syncA, syncB, onB } = setup();
+    syncA.pushLocal([el('r1', 1, 10, { x: 5 })]);
     flush();
-    const received = onB.mock.calls[0][0][0] as SyncedElement;
-    received['x'] = 777;
-    syncB.getElements()[0]['x'] = 888;
-    expect(syncB.getElements()[0]['x']).toBe(0);
-    expect(getBoardElements(a).get('e')?.['x']).toBe(0);
-    expect(getBoardElements(a).get('e')).not.toBe(received);
+    const delivered = onB.mock.calls[0][0] as SyncedElement[];
+    delivered[0]['x'] = 999;
+    syncB.getElements()[0]['x'] = 777;
+    expect(getBoardElements(b).get('r1')?.['x']).toBe(5);
+    expect(syncB.getElements()[0]['x']).toBe(5);
+  });
+
+  it('deep-copies pushed elements: in-place nested mutation (points, boundElements) does not leak', () => {
+    const { a, b, flush, syncA, syncB } = setup();
+    const arrow = el('r1', 1, 10, {
+      type: 'arrow',
+      points: [[0, 0], [10, 10]],
+      boundElements: [{ id: 't1', type: 'text' }],
+    });
+    syncA.pushLocal([arrow]);
+    // Excalidraw mutates elements in place
+    (arrow['points'] as number[][])[1][0] = 99;
+    (arrow['boundElements'] as unknown[]).push({ id: 't2', type: 'text' });
+    flush();
+    expect(getBoardElements(a).get('r1')?.['points']).toEqual([[0, 0], [10, 10]]);
+    expect(syncA.getElements()[0]['boundElements']).toEqual([{ id: 't1', type: 'text' }]);
+    expect(getBoardElements(b).get('r1')?.['points']).toEqual([[0, 0], [10, 10]]);
+    expect(syncB.getElements()[0]['points']).toEqual([[0, 0], [10, 10]]);
+  });
+
+  it('ignores invalid local elements', () => {
+    const { a, syncA } = setup();
+    syncA.pushLocal([el('img', 1, 1, { type: 'image' }), el('r1', 1, 1)]);
+    expect([...getBoardElements(a).keys()]).toEqual(['r1']);
+  });
+
+  it('ignores an invalid remote value for a new key', () => {
+    const { b, flush, syncA, onA } = setup();
+    getBoardElements(b).set('bad', { id: 'bad' } as unknown as SyncedElement);
+    flush();
+    expect(onA).not.toHaveBeenCalled();
+    expect(syncA.getElements()).toEqual([]);
+  });
+
+  it('heals an invalid remote overwrite of a known element', () => {
+    const { a, b, flush, syncA, syncB, onA } = setup();
+    syncA.pushLocal([el('r1', 1, 10, { x: 5 })]);
+    flush();
+    getBoardElements(b).set('r1', el('r1', 99, 1, { type: 'image' }));
+    flush();
+    expect(onA).not.toHaveBeenCalled();
+    expect(getBoardElements(a).get('r1')?.version).toBe(1);
+    expect(getBoardElements(b).get('r1')?.version).toBe(1);
+    expect(snapshot(syncB)).toEqual([['r1', 1, 10, 5, false]]);
+  });
+
+  it('after destroy, pushLocal writes nothing and remote changes are not delivered', () => {
+    const { a, flush, syncA, syncB, onA } = setup();
+    syncA.destroy();
+    syncA.pushLocal([el('r1', 1, 1)]);
+    expect(getBoardElements(a).size).toBe(0);
+    syncB.pushLocal([el('r2', 1, 1)]);
+    flush();
+    expect(onA).not.toHaveBeenCalled();
+    syncA.destroy(); // idempotent
   });
 });
