@@ -49,7 +49,13 @@ async function setup() {
     return { [COOKIE.session]: server.signCookie(sid) };
   }
 
-  return { server, repos, interviewerCookie, close: app.close };
+  return {
+    server,
+    repos,
+    interviewerCookie,
+    resolveIdentityFromCookieHeader: app.resolveIdentityFromCookieHeader,
+    close: app.close,
+  };
 }
 
 const templateBody = { title: 'URL shortener', instructionsMd: '# Go', rubricMd: '- scaling', durationMin: 45, boardSeed: null };
@@ -132,6 +138,17 @@ describe('API over HTTP', () => {
     expect((await server.inject({ method: 'GET', url: `/join/${token}` })).headers.location).toBe(
       '/link-invalid?reason=session_ended',
     );
+    await close();
+  });
+
+  it('exposes a raw Cookie-header identity resolver (for WebSocket upgrades)', async () => {
+    const { interviewerCookie, resolveIdentityFromCookieHeader, close } = await setup();
+    const ic = await interviewerCookie();
+    const header = Object.entries(ic)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join('; ');
+    expect(await resolveIdentityFromCookieHeader(header)).toMatchObject({ kind: 'interviewer', sub: 'sub-1' });
+    expect(await resolveIdentityFromCookieHeader(undefined)).toBeNull();
     await close();
   });
 

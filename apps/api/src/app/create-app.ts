@@ -18,10 +18,12 @@ import {
   type UsersRepo,
 } from '@swint/api-data-access-persistence';
 import {
+  createCookieIdentityResolver,
   createIdentityResolver,
   createOidcClient,
   registerAuthRoutes,
   registerJoinRoute,
+  type CookieHeaderIdentityResolver,
   type OidcClient,
 } from '@swint/api-feature-auth';
 import { noopSessionEvents, type SessionEvents } from '@swint/api-feature-sessions';
@@ -39,10 +41,18 @@ export interface AppRepos {
   blobs: BlobStore;
 }
 
+export interface App {
+  server: FastifyInstance;
+  repos: AppRepos;
+  /** Resolves an identity from a raw Cookie header (e.g. a WebSocket upgrade request). */
+  resolveIdentityFromCookieHeader: CookieHeaderIdentityResolver;
+  close(): Promise<void>;
+}
+
 export async function createApp(
   config: AppConfig,
   overrides: { oidc?: OidcClient; events?: SessionEvents } = {},
-): Promise<{ server: FastifyInstance; repos: AppRepos; close(): Promise<void> }> {
+): Promise<App> {
   const aws = {
     region: config.awsRegion,
     dynamoEndpoint: config.dynamoEndpoint,
@@ -108,6 +118,7 @@ export async function createApp(
   return {
     server,
     repos,
+    resolveIdentityFromCookieHeader: createCookieIdentityResolver({ ...repos, clock, cookieSecret: config.cookieSecret }),
     close: async () => {
       await server.close();
       raw.destroy();
