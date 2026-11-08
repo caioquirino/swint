@@ -35,6 +35,13 @@ export const configSchema = raw.transform((env, ctx) => {
     ctx.addIssue({ code: 'custom', path: ['OIDC_CLIENT_SECRET'], message: 'OIDC_CLIENT_SECRET is required in production' });
     return z.NEVER;
   }
+  // Production must never fall back to the localhost dev URLs (OIDC redirects, issuer discovery).
+  const required = { PUBLIC_BASE_URL: env.PUBLIC_BASE_URL, OIDC_ISSUER: env.OIDC_ISSUER };
+  const missing = prod ? Object.entries(required).filter(([, v]) => !v) : [];
+  for (const [name] of missing) {
+    ctx.addIssue({ code: 'custom', path: [name], message: `${name} is required in production` });
+  }
+  if (missing.length > 0) return z.NEVER;
   const dynamoEndpoint = env.DYNAMODB_ENDPOINT ?? (prod ? undefined : 'http://localhost:8000');
   const s3Endpoint = env.S3_ENDPOINT ?? (prod ? undefined : 'http://localhost:9090');
   const awsCredentials =
