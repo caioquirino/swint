@@ -6,6 +6,8 @@ import { createBlobStore, type BlobStore } from '../lib/blob-store.js';
 import { createUsersRepo, type UsersRepo } from '../lib/users-repo.js';
 import { createAuthSessionsRepo, type AuthSessionsRepo } from '../lib/auth-sessions-repo.js';
 import { createTemplatesRepo, type TemplatesRepo } from '../lib/templates-repo.js';
+import { createSessionsRepo, type SessionsRepo } from '../lib/sessions-repo.js';
+import { createInvitesRepo, type InvitesRepo } from '../lib/invites-repo.js';
 import type { Table } from '../lib/table.js';
 import type { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import type { S3Client } from '@aws-sdk/client-s3';
@@ -54,6 +56,8 @@ export interface TestStores {
   users: UsersRepo;
   authSessions: AuthSessionsRepo;
   templates: TemplatesRepo;
+  sessions: SessionsRepo;
+  invites: InvitesRepo;
 }
 
 /** Fresh, isolated table + bucket per call (unique names). Requires the globalSetup below. */
@@ -77,5 +81,7 @@ export async function createTestStores(): Promise<TestStores> {
     users: createUsersRepo(table),
     authSessions: createAuthSessionsRepo(table),
     templates: createTemplatesRepo(table),
+    sessions: createSessionsRepo(table),
+    invites: createInvitesRepo(table),
   };
 }

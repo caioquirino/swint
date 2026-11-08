@@ -6,3 +6,5 @@ export * from './lib/records.js';
 export * from './lib/users-repo.js';
 export * from './lib/auth-sessions-repo.js';
 export * from './lib/templates-repo.js';
+export * from './lib/sessions-repo.js';
+export * from './lib/invites-repo.js';
