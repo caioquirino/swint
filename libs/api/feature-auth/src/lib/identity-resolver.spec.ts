@@ -116,6 +116,13 @@ describe('identity resolver', () => {
       await whoami({ [COOKIE.candidate]: sign({ sessionId: 's1', inviteHash: 'inv-hash', exp: NOW + 1 }) }),
     ).toBeNull();
   });
+
+  it('candidate cookie for a non-revoked invite that is no longer the session active invite → null', async () => {
+    const { stores, app, whoami } = await setup();
+    await stores.invites.create({ hash: 'old-hash', orgId: 'default', sessionId: 's1', createdAt: 0, revokedAt: null });
+    const value = app.signCookie(JSON.stringify({ sessionId: 's1', inviteHash: 'old-hash', exp: NOW + 1000 }));
+    expect(await whoami({ [COOKIE.candidate]: value })).toBeNull();
+  });
 });
 
 describe('cookie-header identity resolver (raw upgrade requests)', () => {
@@ -176,6 +183,13 @@ describe('cookie-header identity resolver (raw upgrade requests)', () => {
       inviteHash: 'inv-hash',
       name: 'Bo',
     });
+  });
+
+  it('candidate cookie for a superseded (but unrevoked) invite → null', async () => {
+    const { stores, app, resolveHeader, header } = await headerSetup();
+    await stores.invites.create({ hash: 'old-hash', orgId: 'default', sessionId: 's1', createdAt: 0, revokedAt: null });
+    const value = app.signCookie(JSON.stringify({ sessionId: 's1', inviteHash: 'old-hash', exp: NOW + 1000 }));
+    expect(await resolveHeader(header({ [COOKIE.candidate]: value }))).toBeNull();
   });
 
   it('tampered or unsigned cookies → null', async () => {

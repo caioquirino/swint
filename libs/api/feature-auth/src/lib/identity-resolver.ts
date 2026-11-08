@@ -46,7 +46,8 @@ async function resolveIdentity(deps: IdentityResolverDeps, read: SignedCookieRea
     const invite = await deps.invites.get(cand.inviteHash);
     if (invite && invite.revokedAt === null && invite.sessionId === cand.sessionId) {
       const session = await deps.sessions.get(invite.orgId, invite.sessionId);
-      if (session) {
+      // Only the session's current invite counts: a regenerated invite supersedes older ones.
+      if (session && session.activeInviteHash === invite.hash) {
         return {
           kind: 'candidate',
           sessionId: session.id,

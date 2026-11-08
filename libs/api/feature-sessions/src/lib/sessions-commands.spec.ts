@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Identity } from '@swint/api-util-rpc';
 import { sha256Hex } from '@swint/api-util-rpc';
+import { StaleWriteError } from '@swint/api-data-access-persistence';
 import { setupSessions } from './test-setup.js';
 
 const ada: Identity = { kind: 'interviewer', sub: 'sub-1', name: 'Ada', email: null, orgId: 'default', roles: ['interviewer'] };
@@ -65,6 +66,20 @@ describe('regenerateInvite', () => {
     await expect(stores.invites.get(sha256Hex('token-1'))).resolves.toMatchObject({ revokedAt: expect.any(Number) });
     await expect(stores.invites.get(sha256Hex('token-2'))).resolves.toMatchObject({ revokedAt: null, sessionId: id });
     await expect(stores.sessions.get('default', id)).resolves.toMatchObject({ activeInviteHash: sha256Hex('token-2') });
+  });
+
+  it('succeeds even when revoking the old invite fails (activeInviteHash already moved)', async () => {
+    const { as, id, stores } = await created();
+    vi.spyOn(stores.invites, 'revoke').mockRejectedValueOnce(new Error('dynamo hiccup'));
+    await expect(as(ada).regenerateInvite({ id })).resolves.toEqual({ candidateUrl: 'http://localhost:4200/join/token-2' });
+    await expect(stores.sessions.get('default', id)).resolves.toMatchObject({ activeInviteHash: sha256Hex('token-2') });
+  });
+
+  it('keeps the original error when the rollback revoke also fails', async () => {
+    const { as, id, stores } = await created();
+    vi.spyOn(stores.sessions, 'update').mockRejectedValueOnce(new StaleWriteError());
+    vi.spyOn(stores.invites, 'revoke').mockRejectedValueOnce(new Error('dynamo hiccup'));
+    await expect(as(ada).regenerateInvite({ id })).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
   it('is CONFLICT once the session is finished', async () => {

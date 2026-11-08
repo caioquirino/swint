@@ -65,6 +65,14 @@ describe('GET /join/:token', () => {
     expect(revoked.cookies.find((x) => x.name === COOKIE.candidate)).toBeUndefined();
   });
 
+  it('non-revoked invite that is no longer the session active invite → invite_revoked', async () => {
+    const { app, stores } = await setup();
+    await stores.invites.create({ hash: sha256Hex('old'), orgId: 'default', sessionId: 's1', createdAt: 0, revokedAt: null });
+    const res = await app.inject({ method: 'GET', url: '/join/old' });
+    expect(res.headers.location).toBe('/link-invalid?reason=invite_revoked');
+    expect(res.cookies.find((x) => x.name === COOKIE.candidate)).toBeUndefined();
+  });
+
   it('finished session → invalid page with session_ended', async () => {
     const { app } = await setup('ended');
     const res = await app.inject({ method: 'GET', url: '/join/tok' });

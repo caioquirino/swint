@@ -127,11 +127,21 @@ export function createSessionsRouter(deps: SessionsDeps) {
       try {
         await deps.sessions.update({ ...rec, activeInviteHash: invite.hash }, rec.version);
       } catch (e) {
-        await deps.invites.revoke(invite.hash, deps.clock.now());
+        try {
+          await deps.invites.revoke(invite.hash, deps.clock.now());
+        } catch {
+          // Best effort: the new invite never became the session's activeInviteHash, so it is
+          // already unusable (join and identity resolution require activeInviteHash === hash).
+        }
         if (e instanceof StaleWriteError) throw new ORPCError('CONFLICT', { message: 'Session changed, retry' });
         throw e;
       }
-      await deps.invites.revoke(rec.activeInviteHash, deps.clock.now());
+      try {
+        await deps.invites.revoke(rec.activeInviteHash, deps.clock.now());
+      } catch {
+        // Best effort (no logger in the router): the session now points at the new invite, and
+        // join/identity resolution require activeInviteHash === hash, so the old link is already dead.
+      }
       return { candidateUrl: invite.candidateUrl };
     }),
   };

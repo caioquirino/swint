@@ -17,7 +17,10 @@ export function registerJoinRoute(app: FastifyInstance, deps: JoinRouteDeps): vo
     const invite = await deps.invites.get(hash);
     if (!invite || invite.revokedAt !== null) return reply.redirect('/link-invalid?reason=invite_revoked', 302);
     const session = await deps.sessions.get(invite.orgId, invite.sessionId);
-    if (!session) return reply.redirect('/link-invalid?reason=invite_revoked', 302);
+    // A regenerated invite supersedes the old one even if revoking the old record failed.
+    if (!session || session.activeInviteHash !== invite.hash) {
+      return reply.redirect('/link-invalid?reason=invite_revoked', 302);
+    }
     if (isFinished(session.status)) return reply.redirect('/link-invalid?reason=session_ended', 302);
 
     const payload: CandidateCookie = { sessionId: session.id, inviteHash: hash, exp: deps.clock.now() + SESSION_TTL_MS };

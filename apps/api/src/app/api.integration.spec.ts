@@ -152,6 +152,34 @@ describe('API over HTTP', () => {
     await close();
   });
 
+  it('regenerating the invite kills the old link and the old candidate cookie', async () => {
+    const { server, interviewerCookie, close } = await setup();
+    const ic = await interviewerCookie();
+    const tpl = (await server.inject({ method: 'POST', url: '/api/templates', cookies: ic, payload: templateBody })).json();
+    const { session, candidateUrl } = (
+      await server.inject({ method: 'POST', url: '/api/sessions', cookies: ic, payload: { templateId: tpl.id, candidateName: 'Bo' } })
+    ).json();
+    const oldToken = defined(new URL(candidateUrl).pathname.split('/').pop(), 'invite token');
+    const join = await server.inject({ method: 'GET', url: `/join/${oldToken}` });
+    const oldCc = {
+      [COOKIE.candidate]: defined(
+        join.cookies.find((c) => c.name === COOKIE.candidate),
+        'candidate cookie',
+      ).value,
+    };
+    expect((await server.inject({ method: 'GET', url: `/api/room/${session.id}`, cookies: oldCc })).statusCode).toBe(200);
+
+    const regen = await server.inject({ method: 'POST', url: `/api/sessions/${session.id}/invite`, cookies: ic });
+    expect(regen.statusCode).toBe(200);
+    expect(regen.json().candidateUrl).not.toBe(candidateUrl);
+
+    expect((await server.inject({ method: 'GET', url: `/join/${oldToken}` })).headers.location).toBe(
+      '/link-invalid?reason=invite_revoked',
+    );
+    expect((await server.inject({ method: 'GET', url: `/api/room/${session.id}`, cookies: oldCc })).statusCode).toBe(401);
+    await close();
+  });
+
   it('org isolation over HTTP', async () => {
     const { server, interviewerCookie, close } = await setup();
     const tpl = (
