@@ -20,6 +20,7 @@ export async function queryAll<T>(table: Table, input: Omit<QueryCommandInput, '
 
 /** Remove DynamoDB key attributes before returning a record to callers. */
 export function stripKeys<T extends object>(item: T): Omit<T, 'PK' | 'SK' | 'GSI1PK' | 'GSI1SK'> {
-  const { PK: _pk, SK: _sk, GSI1PK: _g1, GSI1SK: _g2, ...rest } = item as T & Record<string, unknown>;
-  return rest as Omit<T, 'PK' | 'SK' | 'GSI1PK' | 'GSI1SK'>;
+  const rest = { ...item } as Record<string, unknown>;
+  for (const k of ['PK', 'SK', 'GSI1PK', 'GSI1SK']) delete rest[k];
+  return rest as unknown as Omit<T, 'PK' | 'SK' | 'GSI1PK' | 'GSI1SK'>;
 }

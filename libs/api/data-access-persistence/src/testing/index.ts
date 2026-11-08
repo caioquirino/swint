@@ -3,6 +3,9 @@ import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainer
 import { inject } from 'vitest';
 import { createDynamo, createS3, ensureBucket, ensureTable, type AwsConfig } from '../lib/aws.js';
 import { createBlobStore, type BlobStore } from '../lib/blob-store.js';
+import { createUsersRepo, type UsersRepo } from '../lib/users-repo.js';
+import { createAuthSessionsRepo, type AuthSessionsRepo } from '../lib/auth-sessions-repo.js';
+import { createTemplatesRepo, type TemplatesRepo } from '../lib/templates-repo.js';
 import type { Table } from '../lib/table.js';
 import type { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import type { S3Client } from '@aws-sdk/client-s3';
@@ -48,6 +51,9 @@ export interface TestStores {
   s3: S3Client;
   bucket: string;
   blobs: BlobStore;
+  users: UsersRepo;
+  authSessions: AuthSessionsRepo;
+  templates: TemplatesRepo;
 }
 
 /** Fresh, isolated table + bucket per call (unique names). Requires the globalSetup below. */
@@ -60,5 +66,16 @@ export async function createTestStores(): Promise<TestStores> {
   const bucket = `swint-test-${suffix}`;
   await ensureTable(raw, tableName);
   await ensureBucket(s3, bucket);
-  return { cfg, raw, table: { doc, name: tableName }, s3, bucket, blobs: createBlobStore(s3, bucket) };
+  const table: Table = { doc, name: tableName };
+  return {
+    cfg,
+    raw,
+    table,
+    s3,
+    bucket,
+    blobs: createBlobStore(s3, bucket),
+    users: createUsersRepo(table),
+    authSessions: createAuthSessionsRepo(table),
+    templates: createTemplatesRepo(table),
+  };
 }
