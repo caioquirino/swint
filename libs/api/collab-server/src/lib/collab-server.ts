@@ -8,6 +8,7 @@ import { docName, POLICY_CLOSE_CODE, stampAwarenessState, type CloseReason } fro
 import { isFinished } from '@swint/shared-domain';
 import type { Clock, Identity } from '@swint/api-util-rpc';
 import { CollabAccessError, authorizeDocument, targetOf, type DocTarget } from './access.js';
+import { dropForeignClients } from './awareness-ownership.js';
 import { presenceIdentity } from './presence.js';
 import { createDocStore } from './doc-store.js';
 import type { CollabContext, CollabLogger } from './types.js';
@@ -346,10 +347,22 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       retryTimers.delete(documentName);
     },
 
-    async beforeHandleAwareness({ context, states }) {
+    async beforeHandleAwareness({ context, states, removedClients, document, connection }) {
       // Presence identity comes from the authenticated connection, never from the client (spec §7.3).
       const identity = (context as CollabContext | undefined)?.identity;
-      if (!identity) return;
+      if (!identity || !connection) {
+        // Fail closed: nothing unattributable reaches peers.
+        states.clear();
+        removedClients.clear();
+        return;
+      }
+      // A connection may only write or remove its own awareness clientIDs.
+      const others = document.getConnections().filter((c) => c !== connection);
+      dropForeignClients(
+        { own: document.getClients(connection), ownedByOther: (id) => others.some((c) => document.getClients(c).has(id)) },
+        states,
+        removedClients,
+      );
       const who = presenceIdentity(identity);
       for (const [clientId, state] of states) states.set(clientId, stampAwarenessState(state, who));
     },

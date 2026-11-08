@@ -362,4 +362,84 @@ describe('collab server: presence', () => {
     interviewer.destroy();
     candidate.destroy();
   });
+
+  async function threePeers() {
+    const s = await setup('live');
+    const interviewer = connectClient(kit, docName.board(s.id), 'ada');
+    const candidate = connectClient(kit, docName.board(s.id), 'bo');
+    kit.identities.set('ada2', ada);
+    const observer = connectClient(kit, docName.board(s.id), 'ada2');
+    await Promise.all([interviewer.synced, candidate.synced, observer.synced]);
+    interviewer.provider.awareness?.setLocalStateField(AWARENESS_USER_FIELD, { pointer: { x: 1, y: 1, tool: 'pointer' } });
+    const adaId = interviewer.provider.awareness?.clientID as number;
+    const seen = () =>
+      observer.provider.awareness?.getStates().get(adaId)?.[AWARENESS_USER_FIELD] as { name?: string; pointer?: { x: number } } | undefined;
+    await until(() => seen()?.name === 'Ada');
+    return { interviewer, candidate, observer, adaId, seen };
+  }
+
+  /**
+   * Sends a hand-built awareness message through the client's socket, as a malicious client would.
+   * Wire format: varString name, varUint 1 (Awareness), varUint8Array(update); update = varUint n,
+   * then per client varUint clientID, varUint clock, varString JSON state ('null' = removal).
+   */
+  function sendForgedAwareness(c: ReturnType<typeof connectClient>, entries: { clientId: number; clock: number; state: unknown }[]): void {
+    const bytes: number[] = [];
+    const varUint = (n: number) => {
+      while (n > 127) {
+        bytes.push(128 | (n & 127));
+        n = Math.floor(n / 128);
+      }
+      bytes.push(n);
+    };
+    const varString = (str: string) => {
+      const b = new TextEncoder().encode(str);
+      varUint(b.length);
+      bytes.push(...b);
+    };
+    const inner: number[] = [];
+    const saved = bytes.splice(0);
+    varUint(entries.length);
+    for (const e of entries) {
+      varUint(e.clientId);
+      varUint(e.clock);
+      varString(JSON.stringify(e.state));
+    }
+    inner.push(...bytes.splice(0));
+    bytes.push(...saved);
+    varString(c.provider.effectiveName);
+    varUint(1);
+    varUint(inner.length);
+    bytes.push(...inner);
+    (c.provider.configuration.websocketProvider as unknown as { send(d: Uint8Array): void }).send(new Uint8Array(bytes));
+  }
+
+  it('ignores a candidate state sent under the interviewer clientID', async () => {
+    const { interviewer, candidate, observer, adaId, seen } = await threePeers();
+    sendForgedAwareness(candidate, [
+      { clientId: adaId, clock: 1000, state: { [AWARENESS_USER_FIELD]: { name: 'Mallory', pointer: { x: 99, y: 99, tool: 'pointer' } } } },
+    ]);
+    // A later honest update from the candidate proves the forged message was processed before we assert.
+    candidate.provider.awareness?.setLocalStateField(AWARENESS_USER_FIELD, { pointer: { x: 5, y: 5, tool: 'pointer' } });
+    const candId = candidate.provider.awareness?.clientID as number;
+    await until(() => observer.provider.awareness?.getStates().get(candId) !== undefined);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(seen()).toMatchObject({ name: 'Ada', pointer: { x: 1 } });
+    interviewer.destroy();
+    candidate.destroy();
+    observer.destroy();
+  });
+
+  it('ignores a candidate removal of the interviewer clientID', async () => {
+    const { interviewer, candidate, observer, adaId, seen } = await threePeers();
+    sendForgedAwareness(candidate, [{ clientId: adaId, clock: 1000, state: null }]);
+    candidate.provider.awareness?.setLocalStateField(AWARENESS_USER_FIELD, { pointer: { x: 5, y: 5, tool: 'pointer' } });
+    const candId = candidate.provider.awareness?.clientID as number;
+    await until(() => observer.provider.awareness?.getStates().get(candId) !== undefined);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(seen()).toMatchObject({ name: 'Ada' });
+    interviewer.destroy();
+    candidate.destroy();
+    observer.destroy();
+  });
 });
