@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { blobKeys } from '@swint/api-data-access-persistence';
-import { getBoardElements, parseServerMessage, docName } from '@swint/shared-collab-protocol';
+import { AWARENESS_USER_FIELD, candidateUserId, colorForUser, getBoardElements, parseServerMessage, docName } from '@swint/shared-collab-protocol';
 import type { Identity } from '@swint/api-util-rpc';
 import { connectClient, seedSession, startCollabTestKit, type CollabTestKit } from '../testing/collab-test-kit.js';
 
@@ -317,5 +317,49 @@ describe('collab server: persistence', () => {
     await closing;
     late.destroy();
     clients.forEach((c) => c.destroy());
+  });
+});
+
+async function until(pred: () => boolean, timeoutMs = 3000): Promise<void> {
+  const start = Date.now();
+  while (!pred()) {
+    if (Date.now() - start > timeoutMs) throw new Error('condition not met in time');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+
+describe('collab server: presence', () => {
+  it('stamps awareness with the connection identity, so names and roles cannot be spoofed', async () => {
+    const s = await setup('live');
+    const interviewer = connectClient(kit, docName.board(s.id), 'ada');
+    const candidate = connectClient(kit, docName.board(s.id), 'bo');
+    await Promise.all([interviewer.synced, candidate.synced]);
+
+    candidate.provider.awareness?.setLocalStateField(AWARENESS_USER_FIELD, {
+      userId: 'sub-1', name: 'Mallory', role: 'interviewer', color: '#000000',
+      selectedElementIds: {}, pointer: { x: 3, y: 4, tool: 'pointer' },
+    });
+    const candidateClientId = candidate.provider.awareness?.clientID as number;
+
+    const seen = () => interviewer.provider.awareness?.getStates().get(candidateClientId)?.[AWARENESS_USER_FIELD];
+    await until(() => seen() !== undefined);
+    expect(seen()).toEqual({
+      userId: candidateUserId(s.id),
+      name: 'Bo',
+      role: 'candidate',
+      color: colorForUser(candidateUserId(s.id)),
+      selectedElementIds: {},
+      pointer: { x: 3, y: 4, tool: 'pointer' },
+    });
+
+    interviewer.provider.awareness?.setLocalStateField(AWARENESS_USER_FIELD, { name: 'Someone else' });
+    const interviewerClientId = interviewer.provider.awareness?.clientID as number;
+    const seenByCandidate = () =>
+      candidate.provider.awareness?.getStates().get(interviewerClientId)?.[AWARENESS_USER_FIELD] as { name?: string; role?: string } | undefined;
+    await until(() => seenByCandidate()?.name === 'Ada');
+    expect(seenByCandidate()).toMatchObject({ userId: 'sub-1', name: 'Ada', role: 'interviewer' });
+
+    interviewer.destroy();
+    candidate.destroy();
   });
 });

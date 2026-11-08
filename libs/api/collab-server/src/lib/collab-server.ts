@@ -4,10 +4,11 @@ import * as Y from 'yjs';
 import type { BlobStore, SessionRecord, SessionsRepo } from '@swint/api-data-access-persistence';
 import type { CookieHeaderIdentityResolver } from '@swint/api-feature-auth';
 import type { SessionEvents } from '@swint/api-feature-sessions';
-import { docName, POLICY_CLOSE_CODE, type CloseReason } from '@swint/shared-collab-protocol';
+import { docName, POLICY_CLOSE_CODE, stampAwarenessState, type CloseReason } from '@swint/shared-collab-protocol';
 import { isFinished } from '@swint/shared-domain';
 import type { Clock, Identity } from '@swint/api-util-rpc';
 import { CollabAccessError, authorizeDocument, targetOf, type DocTarget } from './access.js';
+import { presenceIdentity } from './presence.js';
 import { createDocStore } from './doc-store.js';
 import type { CollabContext, CollabLogger } from './types.js';
 import { sessionStateMessage } from './session-state.js';
@@ -343,6 +344,14 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       const t = retryTimers.get(documentName);
       if (t) clearTimeout(t);
       retryTimers.delete(documentName);
+    },
+
+    async beforeHandleAwareness({ context, states }) {
+      // Presence identity comes from the authenticated connection, never from the client (spec §7.3).
+      const identity = (context as CollabContext | undefined)?.identity;
+      if (!identity) return;
+      const who = presenceIdentity(identity);
+      for (const [clientId, state] of states) states.set(clientId, stampAwarenessState(state, who));
     },
 
     async onStateless({ documentName }) {
