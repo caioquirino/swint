@@ -25,26 +25,37 @@ export function SessionControls({ sessionId, status }: { sessionId: string; stat
   const [inviteOpen, setInviteOpen] = useState(false);
 
   if (isFinished(status)) return null;
-  const failed = [start, extend, end, cancel, invite].find((m) => m.isError);
+  const failed = [start, extend, end, invite].find((m) => m.isError);
+  const run = <T,>(fn: () => T): T => {
+    [start, extend, end, cancel, invite].forEach((m) => m.reset());
+    return fn();
+  };
+  const closeCancel = (open: boolean) => {
+    setCancelOpen(open);
+    if (!open) {
+      cancel.reset();
+      setReason('');
+    }
+  };
   const busy = [start, extend, end, cancel].some((m) => m.isPending);
 
   const submitCancel = (e: FormEvent) => {
     e.preventDefault();
-    cancel.mutate({ id: sessionId, reason: reason.trim() || undefined }, { onSuccess: () => setCancelOpen(false) });
+    run(() => cancel.mutate({ id: sessionId, reason: reason.trim() || undefined }, { onSuccess: () => closeCancel(false) }));
   };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {status === 'created' ? <Button size="sm" disabled={busy} onClick={() => start.mutate({ id: sessionId })}>Start interview</Button> : null}
+      {status === 'created' ? <Button size="sm" disabled={busy} onClick={() => run(() => start.mutate({ id: sessionId }))}>Start interview</Button> : null}
       {status === 'live'
         ? EXTENSION_MINUTES.map((minutes) => (
-            <Button key={minutes} size="sm" variant="secondary" disabled={busy} onClick={() => extend.mutate({ id: sessionId, minutes })}>
+            <Button key={minutes} size="sm" variant="secondary" disabled={busy} onClick={() => run(() => extend.mutate({ id: sessionId, minutes }))}>
               +{minutes} min
             </Button>
           ))
         : null}
       {status === 'live' ? (
-        <Button size="sm" variant="danger" disabled={busy} onClick={() => window.confirm('End the interview for everyone?') && end.mutate({ id: sessionId })}>
+        <Button size="sm" variant="danger" disabled={busy} onClick={() => window.confirm('End the interview for everyone?') && run(() => end.mutate({ id: sessionId }))}>
           End interview
         </Button>
       ) : null}
@@ -55,7 +66,7 @@ export function SessionControls({ sessionId, status }: { sessionId: string; stat
         disabled={invite.isPending}
         onClick={() => {
           if (window.confirm('Create a new candidate link? The current link stops working immediately.')) {
-            invite.mutate({ id: sessionId }, { onSuccess: () => setInviteOpen(true) });
+            run(() => invite.mutate({ id: sessionId }, { onSuccess: () => setInviteOpen(true) }));
           }
         }}
       >
@@ -63,12 +74,13 @@ export function SessionControls({ sessionId, status }: { sessionId: string; stat
       </Button>
       {failed ? <p role="alert" className="text-sm text-red-700">{describeError(failed.error)}</p> : null}
 
-      <Dialog open={cancelOpen} onOpenChange={setCancelOpen} title="Cancel interview" description="The candidate will see that the interview has ended. The reason is never shown to them.">
+      <Dialog open={cancelOpen} onOpenChange={closeCancel} title="Cancel interview" description="The candidate will see that the interview has ended. The reason is never shown to them.">
         <form onSubmit={submitCancel} className="space-y-3">
           <label className="block text-sm">
             Reason (optional, private)
             <textarea value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} className="mt-1 block w-full rounded-md border border-slate-300 p-2" />
           </label>
+          {cancel.isError ? <p role="alert" className="text-sm text-red-700">{describeError(cancel.error)}</p> : null}
           <Button type="submit" variant="danger" disabled={cancel.isPending}>Cancel interview</Button>
         </form>
       </Dialog>

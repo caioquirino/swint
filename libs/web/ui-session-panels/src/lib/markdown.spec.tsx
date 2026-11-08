@@ -14,4 +14,11 @@ describe('Markdown', () => {
     expect(container.querySelector('script')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
   });
+
+  it('does not render javascript: links as live anchors', () => {
+    const { container } = render(<Markdown source={'[x](javascript:alert(1))'} />);
+    for (const a of Array.from(container.querySelectorAll('a'))) {
+      expect(a.getAttribute('href') ?? '').not.toMatch(/^\s*javascript:/i);
+    }
+  });
 });

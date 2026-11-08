@@ -68,4 +68,21 @@ describe('SessionControls', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Start interview' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/changed/i));
   });
+
+  it('shows a failed cancel inside the dialog and clears it when the dialog closes', async () => {
+    const cancel = vi.fn(async () => {
+      throw orpcError('CONFLICT');
+    });
+    renderWithApi(<SessionControls sessionId="s1" status="live" />, { api: fakeApi({ sessions: { cancel } }) });
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Cancel interview' });
+    await userEvent.type(within(dialog).getByLabelText(/reason/i), 'x');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel interview' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/changed/i);
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Cancel interview' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel…' }));
+    expect(within(await screen.findByRole('dialog', { name: 'Cancel interview' })).getByLabelText(/reason/i)).toHaveValue('');
+  });
 });

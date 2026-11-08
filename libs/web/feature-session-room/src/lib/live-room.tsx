@@ -21,10 +21,11 @@ import { ExportMenu } from './export-menu.js';
 import { InterviewEndedScreen, LinkInvalidScreen, RoomUnavailableScreen } from './screens.js';
 import { SessionControls } from './session-controls.js';
 import { useMergedSessionState } from './session-state.js';
+import { WAITING_POLL_MS } from './use-room.js';
 
 type Tab = 'instructions' | 'rubric' | 'notes';
 
-export function LiveRoom({ view }: { view: RoomView }) {
+export function LiveRoom({ view, onRetry, pollMs = WAITING_POLL_MS }: { view: RoomView; onRetry?: () => void; pollMs?: number }) {
   const orpc = useOrpc();
   const queryClient = useQueryClient();
   const { session, snapshot } = useCollabSession({ sessionId: view.sessionId, role: view.role });
@@ -49,9 +50,26 @@ export function LiveRoom({ view }: { view: RoomView }) {
 
   // The REST view decides what the WebSocket cannot tell us: unreachable (maybe a 401 at upgrade), not started, ended.
   const needsProbe = phase?.kind === 'unreachable' || terminalReason === 'not_started' || (interviewer && terminalReason === 'session_ended');
+  const unreachable = phase?.kind === 'unreachable';
+  const notStarted = terminalReason === 'not_started';
   useEffect(() => {
-    if (needsProbe) void queryClient.invalidateQueries({ queryKey: orpc.room.key() });
-  }, [needsProbe, queryClient, orpc]);
+    if (!needsProbe) return;
+    const probe = () => void queryClient.invalidateQueries({ queryKey: orpc.room.key() });
+    probe();
+    // While unreachable keep re-probing REST (it may reveal a 401 or an ended session).
+    if (unreachable) {
+      const id = setInterval(probe, pollMs);
+      return () => clearInterval(id);
+    }
+    return undefined;
+  }, [needsProbe, unreachable, pollMs, queryClient, orpc]);
+
+  // not_started: REST may already say live (eventual consistency), so the view would not change; remount to reconnect.
+  useEffect(() => {
+    if (!notStarted || !onRetry) return;
+    const id = setTimeout(onRetry, pollMs);
+    return () => clearTimeout(id);
+  }, [notStarted, onRetry, pollMs]);
 
   if (terminalReason === 'invite_revoked') return <LinkInvalidScreen reason="invite_revoked" />;
   if (!interviewer && (terminalReason === 'session_ended' || finished)) return <InterviewEndedScreen />;

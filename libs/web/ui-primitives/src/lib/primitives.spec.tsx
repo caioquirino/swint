@@ -45,4 +45,15 @@ describe('ui-primitives', () => {
     expect(writeText).toHaveBeenCalledWith('http://x/join/t');
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
   });
+
+  it('CopyField falls back to manual copy when the clipboard is unavailable or rejects', async () => {
+    for (const clipboard of [undefined, { writeText: vi.fn().mockRejectedValue(new Error('denied')) }]) {
+      Object.defineProperty(navigator, 'clipboard', { value: clipboard, configurable: true });
+      const { unmount } = render(<CopyField label="Candidate link" value="http://x/join/t" />);
+      await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
+      expect(await screen.findByRole('button', { name: 'Press Ctrl+C' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
+      unmount();
+    }
+  });
 });

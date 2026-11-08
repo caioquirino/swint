@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router';
 import { apiError } from '@swint/web-data-access-api';
 import { Button, Screen, Spinner } from '@swint/web-ui-primitives';
@@ -9,6 +10,8 @@ import { useRoomQuery } from './use-room.js';
 export function SessionRoomPage({ pollMs }: { pollMs?: number }) {
   const { sessionId = '' } = useParams();
   const room = useRoomQuery(sessionId, pollMs);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
   const err = apiError(room.error);
 
   if (err?.code === 'UNAUTHORIZED') return <SignInRequiredScreen sessionId={sessionId} />;
@@ -17,7 +20,7 @@ export function SessionRoomPage({ pollMs }: { pollMs?: number }) {
   if (room.data) {
     const view = room.data;
     if (view.role === 'candidate' && view.status === 'created') return <WaitingRoom title={view.title} name={view.me.name} />;
-    return <LiveRoom view={view} />;
+    return <LiveRoom key={attempt} view={view} onRetry={retry} pollMs={pollMs} />;
   }
   if (room.isPending) return <Screen title="Joining…"><Spinner /></Screen>;
   return (

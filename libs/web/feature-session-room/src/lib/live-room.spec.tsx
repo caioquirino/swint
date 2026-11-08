@@ -37,10 +37,10 @@ const stateMsg = (status: 'live' | 'ended' | 'cancelled') => ({
 });
 const phase = (p: CollabPhase, everConnected = true) => ({ conn: { ...initialConnState, phase: p, everConnected } });
 
-function renderLive(view: object, get = vi.fn(async () => view)) {
+function renderLive(view: object, get = vi.fn(async () => view), pollMs?: number) {
   const fake = createFakeCollabSession({ role: (view as { role: 'candidate' | 'interviewer' }).role });
   const utils = renderWithApi(
-    <CollabFactoryProvider factory={fake.factory}><SessionRoomPage /></CollabFactoryProvider>,
+    <CollabFactoryProvider factory={fake.factory}><SessionRoomPage pollMs={pollMs} /></CollabFactoryProvider>,
     { api: fakeApi({ room: { get } }), path: '/s/s1', routePath: '/s/:sessionId' },
   );
   return { ...utils, fake, get };
@@ -92,6 +92,32 @@ describe('LiveRoom (candidate)', () => {
     await screen.findByTestId('board');
     act(() => fake.update(phase({ kind: 'rejected', reason: 'not_started' })));
     expect(await screen.findByRole('heading', { name: /waiting for your interviewer/i })).toBeInTheDocument();
+  });
+
+  it('not_started while REST already says live → remounts and reconnects with a new session', async () => {
+    const fake = createFakeCollabSession({ role: 'candidate' });
+    const factory = vi.fn(() => {
+      // a fresh session starts connected again
+      fake.update(phase({ kind: 'connected' }));
+      return fake.session;
+    });
+    const get = vi.fn(async () => candidateView);
+    renderWithApi(
+      <CollabFactoryProvider factory={factory}><SessionRoomPage pollMs={30} /></CollabFactoryProvider>,
+      { api: fakeApi({ room: { get } }), path: '/s/s1', routePath: '/s/:sessionId' },
+    );
+    await screen.findByTestId('board');
+    const before = factory.mock.calls.length;
+    act(() => fake.update(phase({ kind: 'rejected', reason: 'not_started' })));
+    await waitFor(() => expect(factory.mock.calls.length).toBeGreaterThan(before));
+    expect(await screen.findByTestId('board')).toBeInTheDocument();
+  });
+
+  it('keeps re-probing REST while the socket stays unreachable', async () => {
+    const { fake, get } = renderLive(candidateView, undefined, 30);
+    await screen.findByTestId('board');
+    act(() => fake.update(phase({ kind: 'unreachable' })));
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThanOrEqual(4));
   });
 
   it('shows connection banners', async () => {
