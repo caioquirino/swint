@@ -50,6 +50,9 @@
     },
     {
       "path": "./libs/web/ui-session-panels"
+    },
+    {
+      "path": "./libs/web/feature-dashboard"
     }
   ]
 }
