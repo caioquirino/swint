@@ -1,0 +1,39 @@
+name: swint
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ['start-dev', '--import-realm']
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8080
+      KC_HEALTH_ENABLED: 'true'
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./docker/keycloak:/opt/keycloak/data/import:ro
+
+  dynamodb:
+    image: amazon/dynamodb-local:3.3.2
+    command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-dbPath', '/home/dynamodblocal/data']
+    user: root
+    ports:
+      - '8000:8000'
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+
+  s3:
+    image: adobe/s3mock:5.2.3
+    user: root
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: 'true'
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /data
+    ports:
+      - '9090:9090'
+    volumes:
+      - s3-data:/data
+
+volumes:
+  dynamodb-data:
+  s3-data:

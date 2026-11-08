@@ -1,0 +1,78 @@
+{
+  "realm": "swint",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "interviewer", "description": "Can run interviews and manage templates" },
+      { "name": "admin", "description": "Reserved for administration" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "swint-api",
+      "name": "Swint API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "swint-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:4200/auth/callback", "http://localhost:3000/auth/callback"],
+      "webOrigins": ["http://localhost:4200", "http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:4200/*##http://localhost:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "interviewer1",
+      "enabled": true,
+      "email": "interviewer1@example.com",
+      "emailVerified": true,
+      "firstName": "Ada",
+      "lastName": "Interviewer",
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["interviewer"]
+    },
+    {
+      "username": "interviewer2",
+      "enabled": true,
+      "email": "interviewer2@example.com",
+      "emailVerified": true,
+      "firstName": "Grace",
+      "lastName": "Interviewer",
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["interviewer"]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "firstName": "Alan",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["interviewer", "admin"]
+    }
+  ]
+}
