@@ -1,15 +1,16 @@
 import { ORPCError } from '@orpc/server';
 import type { BoardSeed } from '@swint/shared-api-contract';
-import { initialLifecycle } from '@swint/shared-domain';
+import { applyCommand, initialLifecycle, InvalidTransitionError, isFinished, type SessionCommand } from '@swint/shared-domain';
 import {
   blobKeys,
   type BlobStore,
   type InvitesRepo,
   type SessionRecord,
   type SessionsRepo,
+  StaleWriteError,
   type TemplatesRepo,
 } from '@swint/api-data-access-persistence';
-import { interviewerProcedures, sha256Hex, type Clock, type IdGenerator } from '@swint/api-util-rpc';
+import { interviewerProcedures, sha256Hex, type Clock, type IdGenerator, type InterviewerIdentity } from '@swint/api-util-rpc';
 import { buildInitialBoardUpdate } from './initial-board.js';
 import { toSession, toSessionSummary } from './mappers.js';
 import type { SessionEvents } from './session-events.js';
@@ -44,9 +45,25 @@ export function createSessionsRouter(deps: SessionsDeps) {
     return { hash, candidateUrl: `${deps.publicBaseUrl}/join/${token}` };
   }
 
-  const notImplemented = () => {
-    throw new ORPCError('NOT_IMPLEMENTED');
-  };
+  async function runCommand(interviewer: InterviewerIdentity, id: string, command: SessionCommand) {
+    const rec = await load(interviewer.orgId, id);
+    let next: SessionRecord;
+    try {
+      next = { ...rec, ...applyCommand(rec, command, { now: deps.clock.now(), actorId: interviewer.sub }) };
+    } catch (e) {
+      if (e instanceof InvalidTransitionError) throw new ORPCError('CONFLICT', { message: e.message });
+      throw e;
+    }
+    let stored: SessionRecord;
+    try {
+      stored = await deps.sessions.update(next, rec.version);
+    } catch (e) {
+      if (e instanceof StaleWriteError) throw new ORPCError('CONFLICT', { message: 'Session changed, retry' });
+      throw e;
+    }
+    await deps.events.sessionChanged(stored);
+    return toSession(stored);
+  }
 
   return {
     list: p.list.handler(async ({ input, context }) =>
@@ -95,10 +112,27 @@ export function createSessionsRouter(deps: SessionsDeps) {
       };
     }),
 
-    start: p.start.handler(notImplemented),
-    extend: p.extend.handler(notImplemented),
-    end: p.end.handler(notImplemented),
-    cancel: p.cancel.handler(notImplemented),
-    regenerateInvite: p.regenerateInvite.handler(notImplemented),
+    start: p.start.handler(({ input, context }) => runCommand(context.interviewer, input.id, { type: 'start' })),
+    extend: p.extend.handler(({ input, context }) =>
+      runCommand(context.interviewer, input.id, { type: 'extend', minutes: input.minutes }),
+    ),
+    end: p.end.handler(({ input, context }) => runCommand(context.interviewer, input.id, { type: 'end' })),
+    cancel: p.cancel.handler(({ input, context }) =>
+      runCommand(context.interviewer, input.id, { type: 'cancel', reason: input.reason }),
+    ),
+    regenerateInvite: p.regenerateInvite.handler(async ({ input, context }) => {
+      const rec = await load(context.interviewer.orgId, input.id);
+      if (isFinished(rec.status)) throw new ORPCError('CONFLICT', { message: 'Session is finished' });
+      const invite = await issueInvite(rec.orgId, rec.id);
+      try {
+        await deps.sessions.update({ ...rec, activeInviteHash: invite.hash }, rec.version);
+      } catch (e) {
+        await deps.invites.revoke(invite.hash, deps.clock.now());
+        if (e instanceof StaleWriteError) throw new ORPCError('CONFLICT', { message: 'Session changed, retry' });
+        throw e;
+      }
+      await deps.invites.revoke(rec.activeInviteHash, deps.clock.now());
+      return { candidateUrl: invite.candidateUrl };
+    }),
   };
 }
