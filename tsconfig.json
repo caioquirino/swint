@@ -53,6 +53,9 @@
     },
     {
       "path": "./libs/web/feature-dashboard"
+    },
+    {
+      "path": "./libs/web/feature-template-editor"
     }
   ]
 }

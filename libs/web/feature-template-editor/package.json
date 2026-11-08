@@ -1,0 +1,36 @@
+{
+  "name": "@swint/web-feature-template-editor",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "nx": {
+    "name": "web-feature-template-editor",
+    "tags": [
+      "scope:web",
+      "type:feature"
+    ]
+  },
+  "dependencies": {
+    "@swint/shared-api-contract": "workspace:*",
+    "@swint/shared-collab-protocol": "workspace:*",
+    "@swint/web-data-access-api": "workspace:*",
+    "@swint/web-ui-primitives": "workspace:*",
+    "@swint/web-ui-session-panels": "workspace:*",
+    "@swint/web-ui-whiteboard": "workspace:*",
+    "@tanstack/react-query": "^5.107.1",
+    "react": "^19.0.0",
+    "react-router": "^7.18.5",
+    "tslib": "^2.3.0",
+    "zod": "^4.0.0"
+  }
+}
