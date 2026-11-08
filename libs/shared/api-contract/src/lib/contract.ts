@@ -1,6 +1,5 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
-import { SESSION_STATUSES, type SessionStatus } from '@swint/shared-domain';
 import {
   boardSeedSchema,
   createSessionInputSchema,
@@ -10,6 +9,7 @@ import {
   meSchema,
   roomViewSchema,
   sessionSchema,
+  sessionStatusSchema,
   sessionSummarySchema,
   templateInputSchema,
   templateSchema,
@@ -25,7 +25,7 @@ export const contract = {
   templates: {
     list: oc
       .route({ method: 'GET', path: '/templates' })
-      .input(z.object({ includeArchived: z.coerce.boolean().optional() }))
+      .input(z.object({ includeArchived: z.union([z.boolean(), z.stringbool()]).optional() }))
       .output(z.array(templateSummarySchema)),
     get: oc.route({ method: 'GET', path: '/templates/{id}' }).input(byId).output(templateSchema),
     getSeed: oc.route({ method: 'GET', path: '/templates/{id}/seed' }).input(byId).output(boardSeedSchema),
@@ -39,7 +39,7 @@ export const contract = {
   sessions: {
     list: oc
       .route({ method: 'GET', path: '/sessions' })
-      .input(z.object({ status: z.enum(SESSION_STATUSES as [SessionStatus, ...SessionStatus[]]).optional() }))
+      .input(z.object({ status: sessionStatusSchema.optional() }))
       .output(z.array(sessionSummarySchema)),
     get: oc.route({ method: 'GET', path: '/sessions/{id}' }).input(byId).output(sessionSchema),
     create: oc
@@ -54,7 +54,7 @@ export const contract = {
     end: oc.route({ method: 'POST', path: '/sessions/{id}/end' }).input(byId).output(sessionSchema),
     cancel: oc
       .route({ method: 'POST', path: '/sessions/{id}/cancel' })
-      .input(byId.extend({ reason: z.string().trim().max(500).optional() }))
+      .input(byId.extend({ reason: z.string().trim().max(500).optional().transform((r) => r || undefined) }))
       .output(sessionSchema),
     regenerateInvite: oc
       .route({ method: 'POST', path: '/sessions/{id}/invite' })

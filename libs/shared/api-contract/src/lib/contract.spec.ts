@@ -38,4 +38,34 @@ describe('contract', () => {
       ].sort(),
     );
   });
+
+  describe('input coercion', () => {
+    const parse = (proc: unknown, v: unknown) =>
+      (proc as { '~orpc': { inputSchema: { safeParse: (x: unknown) => { success: boolean; data?: unknown } } } })[
+        '~orpc'
+      ].inputSchema.safeParse(v);
+
+    it.each([
+      ['false', false],
+      ['true', true],
+      [false, false],
+      [true, true],
+    ])('templates.list includeArchived %j -> %j', (input, expected) => {
+      const r = parse(contract.templates.list, { includeArchived: input });
+      expect(r.success).toBe(true);
+      expect(r.data).toEqual({ includeArchived: expected });
+    });
+
+    it('templates.list allows omitted includeArchived and rejects garbage', () => {
+      const r = parse(contract.templates.list, {});
+      expect(r.success).toBe(true);
+      expect((r.data as { includeArchived?: boolean }).includeArchived).toBeUndefined();
+      expect(parse(contract.templates.list, { includeArchived: 'nope' }).success).toBe(false);
+    });
+
+    it('sessions.cancel normalises the reason', () => {
+      expect((parse(contract.sessions.cancel, { id: 's1', reason: '   ' }).data as { reason?: string }).reason).toBeUndefined();
+      expect((parse(contract.sessions.cancel, { id: 's1', reason: ' no-show ' }).data as { reason?: string }).reason).toBe('no-show');
+    });
+  });
 });

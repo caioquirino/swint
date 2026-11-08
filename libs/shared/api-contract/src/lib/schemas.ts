@@ -6,7 +6,7 @@ import {
 } from '@swint/shared-domain';
 
 const epochMs = z.number().int().nonnegative();
-const sessionStatusSchema = z.enum(SESSION_STATUSES as [SessionStatus, ...SessionStatus[]]);
+export const sessionStatusSchema = z.enum(SESSION_STATUSES as [SessionStatus, ...SessionStatus[]]);
 
 export const idSchema = z.string().min(1).max(64);
 /** Must stay in sync with EXTENSION_MINUTES in shared-domain (5 | 10). */
