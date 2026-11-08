@@ -90,9 +90,13 @@
       },
       "serve": {
         "continuous": true,
+        "executor": "nx:run-commands",
         "dependsOn": [
-          "^build"
-        ]
+          "build"
+        ],
+        "options": {
+          "command": "node apps/api/dist/main.js"
+        }
       }
     },
     "tags": [
