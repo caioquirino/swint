@@ -3,3 +3,5 @@ export * from './lib/documents.js';
 export * from './lib/stateless.js';
 export * from './lib/awareness.js';
 export * from './lib/close-reasons.js';
+export * from './lib/presence.js';
+export * from './lib/board-validation.js';
