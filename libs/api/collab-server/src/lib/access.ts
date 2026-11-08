@@ -28,6 +28,9 @@ export function authorizeDocument(
 ): { readOnly: boolean } {
   if (!session || session.orgId !== identity.orgId) throw new CollabAccessError('forbidden');
   if (identity.kind === 'candidate' && identity.sessionId !== target.sessionId) throw new CollabAccessError('forbidden');
+  if (identity.kind === 'candidate' && identity.inviteHash !== session.activeInviteHash) {
+    throw new CollabAccessError('invite_revoked');
+  }
   if (identity.kind === 'interviewer' && !identity.roles.includes(INTERVIEWER_ROLE)) {
     throw new CollabAccessError('forbidden');
   }

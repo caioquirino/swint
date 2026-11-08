@@ -69,6 +69,36 @@ describe('sessionChanged', () => {
     b.destroy();
   });
 
+  it('on invite regeneration: candidates on the old invite are disconnected with invite_revoked; interviewers untouched', async () => {
+    const s = await live();
+    const a = connectClient(kit, docName.board(s.id), 'ada');
+    const b = connectClient(kit, docName.board(s.id), 'bo');
+    await Promise.all([a.synced, b.synced]);
+    const n = a.stateless.length;
+
+    await kit.collab.events.sessionChanged({ ...s, activeInviteHash: 'h2', version: 2 });
+
+    await expect(b.closed).resolves.toEqual({ code: 4403, reason: 'invite_revoked' });
+    await expect.poll(() => a.stateless.length).toBe(n + 1);
+    const board = kit.collab.hocuspocus.documents.get(docName.board(s.id));
+    await expect.poll(() => board?.getConnections().map((c) => [c.context.identity.kind, c.readOnly])).toEqual([
+      ['interviewer', false],
+    ]);
+    a.destroy();
+    b.destroy();
+  });
+
+  it('a stale record with another invite hash does not disconnect the candidate (version guard)', async () => {
+    const s = await live();
+    const b = connectClient(kit, docName.board(s.id), 'bo');
+    await b.synced;
+    await kit.collab.events.sessionChanged({ ...s, extensionSec: 600, version: 3 });
+    await kit.collab.events.sessionChanged({ ...s, activeInviteHash: 'h2', version: 2 });
+    const closed = await Promise.race([b.closed, sleep(300).then(() => 'open')]);
+    expect(closed).toBe('open');
+    b.destroy();
+  });
+
   it('writes periodic checkpoints while live', async () => {
     const s = await live({ checkpointIntervalMs: 100 });
     const a = connectClient(kit, docName.board(s.id), 'ada');
@@ -246,6 +276,18 @@ describe('authentication edge cases', () => {
     const b = connectClient(kit, docName.board(s.id), 'bo');
     await expect(b.closed).resolves.toEqual({ code: 4403, reason: 'session_ended' });
     expect(statuses(b)).toContain('ended');
+    b.destroy();
+  });
+
+  it('an invite regenerated between authentication and registration disconnects the candidate with invite_revoked', async () => {
+    const s = await live();
+    kit.afterSessionGet = async () => {
+      kit.afterSessionGet = null;
+      const regenerated = await kit.stores.sessions.update({ ...s, activeInviteHash: 'h2' }, s.version);
+      await kit.collab.events.sessionChanged(regenerated);
+    };
+    const b = connectClient(kit, docName.board(s.id), 'bo');
+    await expect(b.closed).resolves.toEqual({ code: 4403, reason: 'invite_revoked' });
     b.destroy();
   });
 

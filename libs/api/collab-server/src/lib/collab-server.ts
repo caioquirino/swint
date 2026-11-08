@@ -37,7 +37,7 @@ export interface CollabServerDeps {
 
 export interface CollabServer {
   readonly hocuspocus: Hocuspocus<CollabContext>;
-  /** Broadcasts session.state, enforces end of session and writes checkpoints. Never throws. */
+  /** Broadcasts session.state, enforces end of session and invite revocation, writes checkpoints. Never throws. */
   readonly events: SessionEvents & { sessionChanged(rec: SessionRecord): Promise<void> };
   /** Handles WebSocket upgrades on `path` (default '/collab'). */
   attach(httpServer: Server, path?: string): void;
@@ -123,14 +123,22 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
     connection.webSocket.close(POLICY_CLOSE_CODE, reason);
   }
 
-  /** Finished session: an interviewer connection becomes read-only, a candidate's is disconnected. */
-  function enforceEndOn(connection: Connection, sessionId: string): void {
+  /**
+   * Applies `rec`'s access policy to one connection: a candidate whose invite is no longer the active one
+   * is disconnected (invite_revoked); once the session is finished, a candidate is disconnected
+   * (session_ended) and an interviewer connection becomes read-only.
+   */
+  function enforceOn(connection: Connection, rec: SessionRecord): void {
     try {
       const identity = (connection.context as CollabContext | undefined)?.identity;
-      if (identity?.kind === 'candidate') disconnect(connection, 'session_ended');
-      else connection.readOnly = true;
+      if (identity?.kind === 'candidate' && identity.inviteHash !== rec.activeInviteHash) {
+        disconnect(connection, 'invite_revoked');
+      } else if (isFinished(rec.status)) {
+        if (identity?.kind === 'candidate') disconnect(connection, 'session_ended');
+        else connection.readOnly = true;
+      }
     } catch (err) {
-      logger.error({ sessionId, err }, 'collab: failed to apply end of session to a connection');
+      logger.error({ sessionId: rec.id, err }, 'collab: failed to apply session change to a connection');
     }
   }
 
@@ -160,8 +168,8 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       } catch (err) {
         logger.error({ sessionId, err }, 'collab: failed to broadcast session.state');
       }
+      for (const doc of docs) for (const connection of doc.getConnections()) enforceOn(connection, rec);
       if (isFinished(rec.status)) {
-        for (const doc of docs) for (const connection of doc.getConnections()) enforceEndOn(connection, rec.id);
         if (board) {
           stopCheckpoints(boardName);
           if (!finalized.has(boardName) && !shuttingDown) {
@@ -183,7 +191,7 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
   function applyToConnection(connection: Connection, documentName: string, rec: SessionRecord): void {
     const target = targetOf(documentName);
     if (target.kind === 'board') connection.sendStateless(sessionStateMessage(rec, deps.clock.now()));
-    if (isFinished(rec.status)) enforceEndOn(connection, rec.id);
+    enforceOn(connection, rec);
   }
 
   async function persist(document: Y.Doc, documentName: string, orgId: string | undefined, retries?: number): Promise<void> {

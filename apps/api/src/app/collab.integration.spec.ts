@@ -68,6 +68,27 @@ function connect(port: number, name: string, cookie: string) {
   };
 }
 
+/** Follows an invite link and returns the candidate cookie as a Cookie header. */
+async function candidateCookie(app: TestApp, token: string): Promise<string> {
+  const join = await app.server.inject({ method: 'GET', url: `/join/${token}` });
+  const cand = join.cookies.find((c) => c.name === COOKIE.candidate);
+  expect(cand).toBeDefined();
+  return cookieHeader({ [COOKIE.candidate]: cand?.value ?? '' });
+}
+
+/** HTTP status of a refused WebSocket upgrade (rejects if the upgrade succeeds). */
+function upgradeStatus(port: number, cookie?: string): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/collab`, cookie ? { headers: { cookie } } : {});
+    ws.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
+    ws.on('open', () => {
+      ws.close();
+      reject(new Error('unexpectedly opened'));
+    });
+    ws.on('error', () => undefined);
+  });
+}
+
 async function liveSession(app: TestApp) {
   const ic = await app.interviewerCookie();
   const tpl = (await app.server.inject({ method: 'POST', url: '/api/templates', cookies: ic, payload: templateBody })).json();
@@ -113,6 +134,27 @@ describe('collab over the real API server', () => {
     expect((await t.server.inject({ method: 'POST', url: `/api/sessions/${id}/end`, cookies: ic })).statusCode).toBe(200);
     await expect(c.closed).resolves.toBeDefined();
     c.destroy();
+  });
+
+  it('regenerating the invite disconnects the connected candidate (4403 invite_revoked); the old cookie gets 401, the new link works', async () => {
+    t = await setup({ listen: true });
+    const { id, ic, token } = await liveSession(t);
+    const oldCookie = await candidateCookie(t, token);
+    const c = connect(t.port, docName.board(id), oldCookie);
+    await c.synced;
+
+    const regen = await t.server.inject({ method: 'POST', url: `/api/sessions/${id}/invite`, cookies: ic });
+    expect(regen.statusCode).toBe(200);
+    await expect(c.closed).resolves.toMatchObject({ code: 4403, reason: 'invite_revoked' });
+    c.destroy();
+
+    // A fresh upgrade with the superseded candidate cookie: the resolver finds no identity → 401.
+    expect(await upgradeStatus(t.port, oldCookie)).toBe(401);
+
+    const newToken = new URL(regen.json().candidateUrl).pathname.split('/').pop() as string;
+    const fresh = connect(t.port, docName.board(id), await candidateCookie(t, newToken));
+    await fresh.synced;
+    fresh.destroy();
   });
 
   it('upgrade without cookies is rejected with 401 and the server keeps serving', async () => {

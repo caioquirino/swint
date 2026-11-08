@@ -124,8 +124,9 @@ export function createSessionsRouter(deps: SessionsDeps) {
       const rec = await load(context.interviewer.orgId, input.id);
       if (isFinished(rec.status)) throw new ORPCError('CONFLICT', { message: 'Session is finished' });
       const invite = await issueInvite(rec.orgId, rec.id);
+      let stored: SessionRecord;
       try {
-        await deps.sessions.update({ ...rec, activeInviteHash: invite.hash }, rec.version);
+        stored = await deps.sessions.update({ ...rec, activeInviteHash: invite.hash }, rec.version);
       } catch (e) {
         try {
           await deps.invites.revoke(invite.hash, deps.clock.now());
@@ -142,6 +143,8 @@ export function createSessionsRouter(deps: SessionsDeps) {
         // Best effort (no logger in the router): the session now points at the new invite, and
         // join/identity resolution require activeInviteHash === hash, so the old link is already dead.
       }
+      // Cuts off candidates still connected with the old invite (events never throw).
+      await deps.events.sessionChanged(stored);
       return { candidateUrl: invite.candidateUrl };
     }),
   };

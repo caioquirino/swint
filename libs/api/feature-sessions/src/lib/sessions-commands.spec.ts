@@ -68,11 +68,28 @@ describe('regenerateInvite', () => {
     await expect(stores.sessions.get('default', id)).resolves.toMatchObject({ activeInviteHash: sha256Hex('token-2') });
   });
 
+  it('emits sessionChanged with the stored record carrying the new activeInviteHash (cuts off connected candidates)', async () => {
+    const { as, id, events, stores } = await created();
+    await as(ada).regenerateInvite({ id });
+    expect(events.sessionChanged).toHaveBeenCalledTimes(1);
+    const stored = await stores.sessions.get('default', id);
+    expect(events.sessionChanged).toHaveBeenCalledWith(stored);
+    expect(events.sessionChanged.mock.calls[0]?.[0]).toMatchObject({ id, activeInviteHash: sha256Hex('token-2'), version: 2 });
+  });
+
+  it('does not emit sessionChanged when the update fails', async () => {
+    const { as, id, stores, events } = await created();
+    vi.spyOn(stores.sessions, 'update').mockRejectedValueOnce(new StaleWriteError());
+    await expect(as(ada).regenerateInvite({ id })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(events.sessionChanged).not.toHaveBeenCalled();
+  });
+
   it('succeeds even when revoking the old invite fails (activeInviteHash already moved)', async () => {
-    const { as, id, stores } = await created();
+    const { as, id, stores, events } = await created();
     vi.spyOn(stores.invites, 'revoke').mockRejectedValueOnce(new Error('dynamo hiccup'));
     await expect(as(ada).regenerateInvite({ id })).resolves.toEqual({ candidateUrl: 'http://localhost:4200/join/token-2' });
     await expect(stores.sessions.get('default', id)).resolves.toMatchObject({ activeInviteHash: sha256Hex('token-2') });
+    expect(events.sessionChanged).toHaveBeenCalledWith(expect.objectContaining({ activeInviteHash: sha256Hex('token-2') }));
   });
 
   it('keeps the original error when the rollback revoke also fails', async () => {
