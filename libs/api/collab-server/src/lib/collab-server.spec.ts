@@ -217,4 +217,52 @@ describe('collab server: persistence', () => {
     expect(getBoardElements(b.doc).get('e1')).toMatchObject({ version: 4 });
     b.destroy();
   });
+
+  it('retries a store that failed during the flush on last disconnect', async () => {
+    const s = await setup('live', { sleep: async () => undefined, storeRetryMs: 50, debounceMs: 10_000, maxDebounceMs: 20_000 });
+    kit.failPuts = true;
+    const name = docName.board(s.id);
+    const a = connectClient(kit, name, 'ada');
+    await a.synced;
+    getBoardElements(a.doc).set('e1', { id: 'e1', version: 1, versionNonce: 1, index: 'a0', isDeleted: false });
+    await new Promise((r) => setTimeout(r, 100)); // let the update reach the server
+    a.destroy(); // the store is still debounced: Hocuspocus flushes it now, and it fails
+    await expect.poll(() => kit.errors.length, { timeout: 5000 }).toBeGreaterThan(0);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(kit.collab.hocuspocus.documents.has(name)).toBe(true);
+    kit.failPuts = false;
+    await expect
+      .poll(
+        async () => {
+          const bytes = await kit.stores.blobs.getBytes(blobKeys.sessionBoardLatest('default', s.id));
+          if (!bytes) return undefined;
+          const d = new Y.Doc();
+          Y.applyUpdate(d, bytes);
+          return getBoardElements(d).get('e1')?.version;
+        },
+        { timeout: 5000 },
+      )
+      .toBe(1);
+    await expect.poll(() => kit.collab.hocuspocus.documents.has(name), { timeout: 5000 }).toBe(false);
+  });
+
+  it('close() with failing S3 reports unsaved documents once and leaves no retry running', async () => {
+    const s = await setup('live', { sleep: async () => undefined, storeRetryMs: 50 });
+    kit.failPuts = true;
+    const name = docName.board(s.id);
+    const a = connectClient(kit, name, 'ada');
+    await a.synced;
+    getBoardElements(a.doc).set('e1', { id: 'e1', version: 1, versionNonce: 1, index: 'a0', isDeleted: false });
+    await expect.poll(() => kit.errors.length, { timeout: 5000 }).toBeGreaterThan(0);
+    const t0 = Date.now();
+    await kit.collab.close();
+    expect(Date.now() - t0).toBeLessThan(8000);
+    const entries = kit.errors.filter((e) => 'unsaved' in e);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ unsaved: [name], count: 1 });
+    const calls = kit.putCalls;
+    await new Promise((r) => setTimeout(r, 400));
+    expect(kit.putCalls).toBe(calls);
+    a.destroy();
+  });
 });

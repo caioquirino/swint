@@ -17,6 +17,8 @@ export interface CollabTestKit {
   identities: Map<string, Identity>;
   /** While true, every blob write through the collab server fails. */
   failPuts: boolean;
+  /** Number of blob writes attempted through the collab server. */
+  putCalls: number;
   /** Messages passed to the logger at error level. */
   errors: object[];
   close(): Promise<void>;
@@ -33,11 +35,12 @@ export async function startCollabTestKit(
 ): Promise<CollabTestKit> {
   const stores = opts.stores ?? (await createTestStores());
   const errors: object[] = [];
-  const state = { failPuts: false };
+  const state = { failPuts: false, putCalls: 0 };
   const blobs = new Proxy(stores.blobs, {
     get(target, prop, receiver) {
       if (prop === 'putBytes') {
         return async (...args: Parameters<typeof target.putBytes>) => {
+          state.putCalls++;
           if (state.failPuts) throw new Error('injected s3 failure');
           return target.putBytes(...args);
         };
@@ -69,6 +72,9 @@ export async function startCollabTestKit(
     },
     set failPuts(v: boolean) {
       state.failPuts = v;
+    },
+    get putCalls() {
+      return state.putCalls;
     },
     errors,
     url: `ws://127.0.0.1:${port}/collab`,

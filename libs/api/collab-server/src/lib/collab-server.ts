@@ -55,12 +55,14 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
   const orgByDocument = new Map<string, string>();
   /** Documents whose last store failed; they must not be unloaded until a store succeeds. */
   const unsaved = new Set<string>();
+  let closing = false;
   const retryTimers = new Map<string, NodeJS.Timeout>();
 
   async function persist(document: Y.Doc, documentName: string, orgId: string | undefined): Promise<void> {
     const target = targetOf(documentName);
     if (!orgId) {
       unsaved.add(documentName);
+      scheduleRetry(document, documentName);
       logger.error({ sessionId: target.sessionId }, 'collab: cannot store document, org unknown');
       // Throw so Hocuspocus keeps the document dirty instead of treating this as stored.
       throw new Error('collab: cannot store document, org unknown');
@@ -68,17 +70,24 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
     try {
       await docStore.store(orgId, target, Y.encodeStateAsUpdate(document));
       unsaved.delete(documentName);
+      const pending = retryTimers.get(documentName);
+      if (pending) clearTimeout(pending);
+      retryTimers.delete(documentName);
     } catch (err) {
       unsaved.add(documentName);
+      // Hocuspocus does not unload (so beforeUnloadDocument never runs) when the flush on last
+      // disconnect fails; always arm a retry. It is a no-op while connections exist.
+      scheduleRetry(document, documentName);
       logger.error({ sessionId: target.sessionId, err }, 'collab: storing document failed');
       throw err; // Hocuspocus keeps the document dirty
     }
   }
 
   function scheduleRetry(document: Y.Doc, documentName: string): void {
-    if (retryTimers.has(documentName)) return;
+    if (closing || retryTimers.has(documentName)) return;
     const timer = setTimeout(() => {
       retryTimers.delete(documentName);
+      if (closing) return;
       void hocuspocus.unloadDocument(document as never);
     }, deps.storeRetryMs ?? 5000);
     timer.unref();
@@ -144,12 +153,8 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
     // would drop the edits. Keep unsaved documents in memory and retry until the store succeeds.
     async beforeUnloadDocument({ document, documentName }) {
       if (!unsaved.has(documentName)) return;
-      try {
-        await persist(document, documentName, orgByDocument.get(documentName));
-      } catch (err) {
-        scheduleRetry(document, documentName);
-        throw err; // aborts the unload
-      }
+      // A failure throws, which aborts the unload; persist has armed the retry.
+      await persist(document, documentName, orgByDocument.get(documentName));
     },
 
     async afterUnloadDocument({ documentName }) {
@@ -178,6 +183,21 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       const deadline = Date.now() + SHUTDOWN_MAX_MS;
       while (hocuspocus.getDocumentsCount() > 0 && Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, SHUTDOWN_POLL_MS));
+      }
+      closing = true;
+      for (const t of retryTimers.values()) clearTimeout(t);
+      retryTimers.clear();
+      for (const name of [...unsaved]) {
+        const doc = hocuspocus.documents.get(name);
+        if (!doc) continue;
+        try {
+          await persist(doc, name, orgByDocument.get(name));
+        } catch {
+          // already logged by persist; reported once below
+        }
+      }
+      if (unsaved.size > 0) {
+        logger.error({ unsaved: [...unsaved], count: unsaved.size }, 'collab: shutting down with unsaved documents');
       }
       await Promise.all(handles.splice(0).map((h) => h.close()));
     },
