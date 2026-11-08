@@ -27,6 +27,7 @@
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx",
     "src/test-setup.ts",
+    "src/testing/**/*.ts",
     "src/**/*.d.ts"
   ],
   "references": [

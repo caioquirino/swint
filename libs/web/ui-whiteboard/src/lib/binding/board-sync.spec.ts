@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SyncedElement } from '@swint/shared-collab-protocol';
 import { getBoardElements } from '@swint/shared-collab-protocol';
 import { BoardSync } from './board-sync.js';
-import { createPeers } from './test-peers.js';
+import { createPeers } from '../../testing/test-peers.js';
 
 const el = (
   id: string,

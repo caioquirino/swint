@@ -27,6 +27,7 @@
     "vite.config.ts",
     "vite.config.mts",
     "src/test-setup.ts",
+    "src/testing/**",
     "vitest.config.ts",
     "vitest.config.mts",
     "src/**/*.test.ts",
