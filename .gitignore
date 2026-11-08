@@ -12,3 +12,5 @@ out-tsc
 .env
 .env.local
 .superpowers
+vitest.config.*.timestamp*
+.vitest

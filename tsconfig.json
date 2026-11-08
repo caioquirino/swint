@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./libs/shared/domain"
+    },
+    {
+      "path": "./libs/shared/collab-protocol"
+    },
+    {
+      "path": "./libs/shared/api-contract"
+    },
+    {
+      "path": "./libs/web/ui-whiteboard"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@swint/shared-api-contract",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "swint": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "nx": {
+    "name": "shared-api-contract",
+    "tags": [
+      "scope:shared",
+      "type:contract"
+    ]
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  }
+}
