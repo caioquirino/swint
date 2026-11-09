@@ -1,7 +1,3 @@
 # web-feature-template-editor
 
-This library was generated with [Nx](https://nx.dev).
-
-## Running unit tests
-
-Run `nx test web-feature-template-editor` to execute the unit tests via [Vitest](https://vitest.dev/).
+The page for creating and editing interview templates.

@@ -1,7 +1,3 @@
 # web-data-access-collab
 
-This library was generated with [Nx](https://nx.dev).
-
-## Running unit tests
-
-Run `nx test web-data-access-collab` to execute the unit tests via [Vitest](https://vitest.dev/).
+Browser-side real-time session: connection state, the Yjs/Hocuspocus collab session, presence tracking and its React hooks.

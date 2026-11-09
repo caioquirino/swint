@@ -24,6 +24,11 @@ export function TemplatesSection() {
           Could not load templates.
         </p>
       ) : null}
+      {archive.isError ? (
+        <p role="alert" className="text-sm text-red-700">
+          Could not archive the template. Please try again.
+        </p>
+      ) : null}
       {templates.data ? (
         <table aria-label="Templates" className="w-full text-left text-sm">
           <thead className="text-slate-500">

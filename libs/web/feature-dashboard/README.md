@@ -1,7 +1,3 @@
 # web-feature-dashboard
 
-This library was generated with [Nx](https://nx.dev).
-
-## Running unit tests
-
-Run `nx test web-feature-dashboard` to execute the unit tests via [Vitest](https://vitest.dev/).
+Interviewer-only pages and chrome: the sign-in guard, app header, layout and the dashboard of sessions and templates.

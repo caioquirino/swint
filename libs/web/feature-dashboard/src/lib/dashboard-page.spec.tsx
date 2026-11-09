@@ -71,4 +71,18 @@ describe('DashboardPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Archive URL shortener' }));
     expect(a.templates.archive).toHaveBeenCalledWith({ id: 't1' }, expect.anything());
   });
+
+  it('reports a failed archive', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const a = api({
+      templates: {
+        archive: vi.fn(async () => {
+          throw new Error('boom');
+        }),
+      },
+    });
+    renderWithApi(<DashboardPage />, { api: fakeApi(a) });
+    await userEvent.click(await screen.findByRole('button', { name: 'Archive URL shortener' }));
+    expect(await screen.findByText('Could not archive the template. Please try again.')).toBeInTheDocument();
+  });
 });

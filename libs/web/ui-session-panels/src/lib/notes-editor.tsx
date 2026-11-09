@@ -36,6 +36,11 @@ export function NotesEditor({ doc, awarenessProvider, user, readOnly, onEditor }
     editor?.setEditable(!readOnly);
   }, [editor, readOnly]);
 
+  // The editor is not recreated for a new user (that would drop the undo history); update the caret instead.
+  useEffect(() => {
+    editor?.commands.updateUser({ name: user.name, color: user.color });
+  }, [editor, user.name, user.color]);
+
   useEffect(() => {
     if (editor) onEditor?.(editor);
   }, [editor, onEditor]);

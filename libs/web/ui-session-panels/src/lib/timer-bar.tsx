@@ -12,12 +12,13 @@ export function formatClock(ms: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-export function useNow(intervalMs = 500): number {
+export function useNow(intervalMs = 500, enabled = true): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!enabled) return undefined;
     const id = setInterval(() => setNow(Date.now()), intervalMs);
     return () => clearInterval(id);
-  }, [intervalMs]);
+  }, [intervalMs, enabled]);
   return now;
 }
 
@@ -39,7 +40,7 @@ export interface TimerBarProps {
 
 /** Spec §6 timer: warnings at 10 and 2 minutes, overtime below zero, frozen once the session is finished. */
 export function TimerBar({ status, timer, offsetMs }: TimerBarProps) {
-  const now = useNow();
+  const now = useNow(500, !isFinished(status));
   let phase: keyof typeof phaseClass;
   let label: string;
   if (isFinished(status)) {

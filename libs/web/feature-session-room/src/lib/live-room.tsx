@@ -25,7 +25,17 @@ import { WAITING_POLL_MS } from './use-room.js';
 
 type Tab = 'instructions' | 'rubric' | 'notes';
 
-export function LiveRoom({ view, onRetry, pollMs = WAITING_POLL_MS }: { view: RoomView; onRetry?: () => void; pollMs?: number }) {
+export function LiveRoom({
+  view,
+  onRetry,
+  pollMs = WAITING_POLL_MS,
+  retryDelayMs,
+}: {
+  view: RoomView;
+  onRetry?: () => void;
+  pollMs?: number;
+  retryDelayMs?: number;
+}) {
   const orpc = useOrpc();
   const queryClient = useQueryClient();
   const { session, snapshot } = useCollabSession({ sessionId: view.sessionId, role: view.role });
@@ -72,9 +82,10 @@ export function LiveRoom({ view, onRetry, pollMs = WAITING_POLL_MS }: { view: Ro
   // not_started: REST may already say live (eventual consistency), so the view would not change; remount to reconnect.
   useEffect(() => {
     if (!notStarted || !onRetry) return;
-    const id = setTimeout(onRetry, pollMs);
+    const delay = retryDelayMs ?? pollMs;
+    const id = setTimeout(onRetry, delay);
     return () => clearTimeout(id);
-  }, [notStarted, onRetry, pollMs]);
+  }, [notStarted, onRetry, pollMs, retryDelayMs]);
 
   if (terminalReason === 'invite_revoked') return <LinkInvalidScreen reason="invite_revoked" />;
   if (!interviewer && (terminalReason === 'session_ended' || finished)) return <InterviewEndedScreen />;

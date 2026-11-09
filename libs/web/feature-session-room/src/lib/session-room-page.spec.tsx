@@ -84,4 +84,21 @@ describe('SessionRoomPage gate', () => {
     expect(screen.getByRole('tab', { name: 'Rubric' })).toBeInTheDocument();
     expect(screen.getByRole('timer')).toHaveAttribute('data-phase', 'not-started');
   });
+
+  it('tells a returning candidate whose link stopped working to get a new link, not to sign in', async () => {
+    localStorage.setItem('swint.candidate.s1', '1');
+    renderRoom(async () => {
+      throw orpcError('UNAUTHORIZED');
+    });
+    expect(await screen.findByRole('heading', { name: 'This link is no longer valid' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /sign in as interviewer/i })).not.toBeInTheDocument();
+    localStorage.clear();
+  });
+
+  it('remembers that this browser joined as the candidate', async () => {
+    renderRoom(async () => candidate('created'));
+    await screen.findByRole('heading', { name: 'Waiting for your interviewer to start' });
+    expect(localStorage.getItem('swint.candidate.s1')).toBe('1');
+    localStorage.clear();
+  });
 });

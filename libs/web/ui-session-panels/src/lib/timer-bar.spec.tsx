@@ -59,3 +59,12 @@ describe('TimerBar', () => {
     expect(screen.getByRole('timer')).not.toHaveTextContent('overtime');
   });
 });
+
+describe('useNow on an ended session', () => {
+  it('does not keep a ticking interval', () => {
+    const spy = vi.spyOn(globalThis, 'setInterval');
+    render(<TimerBar status="ended" timer={{ startedAt: 1, durationSec: 60, extensionSec: 0 }} offsetMs={0} />);
+    expect(spy.mock.calls.filter(([, ms]) => ms === 500)).toHaveLength(0);
+    spy.mockRestore();
+  });
+});

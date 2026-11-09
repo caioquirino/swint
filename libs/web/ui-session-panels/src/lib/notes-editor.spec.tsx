@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { act, render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import * as Y from 'yjs';
 import { Awareness } from 'y-protocols/awareness';
 import type { Editor } from '@tiptap/react';
@@ -48,5 +48,17 @@ describe('NotesEditor', () => {
     );
     await act(async () => undefined);
     expect(editor?.isEditable).toBe(false);
+  });
+});
+
+describe('NotesEditor user changes', () => {
+  it('updates the collaboration caret user without recreating the editor', async () => {
+    const doc = new Y.Doc();
+    const awareness = new Awareness(doc);
+    const props = { doc, awarenessProvider: { awareness }, readOnly: false };
+    const { rerender } = render(<NotesEditor {...props} user={{ name: 'Ada', color: '#111111' }} />);
+    await waitFor(() => expect(awareness.getLocalState()?.['user']).toMatchObject({ name: 'Ada' }));
+    rerender(<NotesEditor {...props} user={{ name: 'Grace', color: '#222222' }} />);
+    await waitFor(() => expect(awareness.getLocalState()?.['user']).toMatchObject({ name: 'Grace', color: '#222222' }));
   });
 });

@@ -63,7 +63,10 @@ function renderLive(view: object, get = vi.fn(async () => view), pollMs?: number
   return { ...utils, fake, get };
 }
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  localStorage.clear();
+});
 
 describe('LiveRoom (candidate)', () => {
   it('edits the board and announces itself with the server-consistent identity', async () => {
@@ -105,7 +108,7 @@ describe('LiveRoom (candidate)', () => {
     const { fake } = renderLive(candidateView, get);
     await screen.findByTestId('board');
     act(() => fake.update(phase({ kind: 'unreachable' })));
-    expect(await screen.findByRole('heading', { name: 'Sign in to join this interview' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'This link is no longer valid' })).toBeInTheDocument();
     expect(get).toHaveBeenCalledTimes(2);
   });
 

@@ -1,7 +1,3 @@
 # web-feature-session-room
 
-This library was generated with [Nx](https://nx.dev).
-
-## Running unit tests
-
-Run `nx test web-feature-session-room` to execute the unit tests via [Vitest](https://vitest.dev/).
+The /s/:sessionId room page and its screens (waiting, ended, sign-in, invalid link) plus merged live session state.
