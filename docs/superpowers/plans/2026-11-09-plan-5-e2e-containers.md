@@ -75,6 +75,8 @@ Every task's requirements implicitly include this section.
 | Unsupported-board toast | `Images and embeds are not supported on the shared board.` |
 | not_started retry backoff | `min(pollMs * 2 ** attempt, 30000)` |
 | Excalidraw font asset path | `window.EXCALIDRAW_ASSET_PATH = \`${window.location.origin}/\``; fonts served at `/fonts/**` |
+| Board style (Task 13) | Fonts: Normal = Nunito (`6`, default), Code = Comic Shanns (`8`); hand-written (`5`) and "more fonts" removed. Lines: `roughness: 0` only. Library: the 17 items of `SWINT_LIBRARY`, fixed. |
+| Images on the board | Not supported in v1 (spec non-goal). Image and embed elements are stripped (Task 6); no file uploads. |
 
 ### Deployment constraint (spec §11 risk 3; carried from Plan 3)
 Run **exactly one API replica**. Collab documents and `sessionChanged` live in process memory. Running more replicas needs sticky routing per session plus pub/sub (Hocuspocus Redis extension). The compose file runs one `api` service with no `deploy.replicas`, and the README states this.
@@ -2413,6 +2415,440 @@ git commit -m "test(web-e2e): connection contract (invite revoked, cancel, sign-
 
 ---
 
+### Task 13: Board look — no hand-written font, clean lines only, a fixed icon library
+
+Product decision (2026-11-09):
+- **Fonts:** the board offers only Excalidraw's built-in **Normal** (Nunito, the default) and **Code** (Comic Shanns). The hand-written font (Excalifont) and the "more fonts" list are removed.
+- **Lines:** shapes always use clean lines (sloppiness "Architect", `roughness: 0`), and the sloppiness control is hidden.
+- **Library:** we ship our own vendor-neutral system-design library. Nothing can be added, imported, published or browsed.
+
+**Files:**
+- Create: `libs/web/ui-whiteboard/src/lib/board-style.ts` and `board-style.spec.ts`
+- Create: `libs/web/ui-whiteboard/src/lib/library/swint-library.ts` and `swint-library.spec.ts`
+- Modify: `libs/web/ui-whiteboard/src/lib/binding/excalidraw-binding.ts`, `excalidraw-binding.spec.ts`
+- Modify: `libs/web/ui-whiteboard/src/lib/components/collaborative-board.tsx`, `collaborative-board.css`, `collaborative-board.spec.tsx`
+- Modify: `libs/web/ui-whiteboard/src/lib/components/seed-board-editor.tsx`
+- Modify: `libs/web/ui-whiteboard/src/index.ts`
+- Modify: `apps/api/src/app/dev-seed.ts` (seed board uses `roughness: 0` and `fontFamily: 6`)
+- Create: `apps/web-e2e/src/board-look.spec.ts`
+
+**Interfaces:**
+- Produces, from `board-style.ts`:
+  - `FONT_NORMAL = 6` (Nunito), `FONT_CODE = 8` (Comic Shanns), `ALLOWED_FONT_FAMILIES`, `CLEAN_ROUGHNESS = 0`
+  - `BOARD_APP_STATE = { currentItemFontFamily: FONT_NORMAL, currentItemRoughness: CLEAN_ROUGHNESS }`
+  - `normalizeStyle(e: SyncedElement): SyncedElement`, which returns the same object when nothing changes
+  - `enforceBoardStyle(scene, api, fns): readonly SyncedElement[]`
+- Produces, from `swint-library.ts`: `SWINT_LIBRARY: LibraryItemData[]` and `isSwintLibrary(items: readonly { id: string }[]): boolean`.
+- `ExcalidrawFns` gains `refreshTextDimensions(elements: readonly SyncedElement[]): readonly SyncedElement[]`. The real implementation calls `restoreElements(els, null, { refreshDimensions: true, repairBindings: false })`.
+- `SceneApi` gains `updateLibrary?(opts: { libraryItems: unknown; merge: boolean }): unknown`.
+- Font ids were verified in the 0.18.1 bundle: `Excalifont:5`, `Nunito:6`, `"Comic Shanns":8`, `Cascadia:3`. They are hard-coded because importing `FONT_FAMILY` would pull the Excalidraw bundle into jsdom specs.
+- Excalidraw 0.18.1 DOM hooks, verified in the bundle:
+  - font buttons `[data-testid="font-family-hand-drawn" | "font-family-normal" | "font-family-code" | "font-family-show-fonts"]`;
+  - the sloppiness control is a `fieldset` whose button group is `group: "sloppiness"`;
+  - context-menu items are `li[data-testid="<actionName>"]`, so add-to-library is `li[data-testid="addToLibrary"]`;
+  - library classes `.library-menu-browse-button` and `.library-menu-dropdown-container`.
+
+- [ ] **Step 1: Write the failing unit tests**
+
+`board-style.spec.ts`:
+```ts
+import { describe, expect, it, vi } from 'vitest';
+import type { SyncedElement } from '@swint/shared-collab-protocol';
+import { CLEAN_ROUGHNESS, FONT_CODE, FONT_NORMAL, enforceBoardStyle, normalizeStyle } from './board-style.js';
+
+const rect = (extra: Record<string, unknown> = {}) =>
+  ({ id: 'r', type: 'rectangle', version: 3, versionNonce: 1, index: 'a0', isDeleted: false, roughness: 0, ...extra }) as SyncedElement;
+const text = (fontFamily: number) =>
+  ({ id: 't', type: 'text', version: 2, versionNonce: 1, index: 'a1', isDeleted: false, roughness: 0, fontFamily }) as SyncedElement;
+
+describe('normalizeStyle', () => {
+  it('leaves conforming elements untouched (same object)', () => {
+    const r = rect();
+    expect(normalizeStyle(r)).toBe(r);
+    const code = text(FONT_CODE);
+    expect(normalizeStyle(code)).toBe(code);
+  });
+
+  it('forces clean lines and a new version', () => {
+    const out = normalizeStyle(rect({ roughness: 1 })) as SyncedElement & { roughness: number };
+    expect(out.roughness).toBe(CLEAN_ROUGHNESS);
+    expect(out.version).toBe(4);
+  });
+
+  it('turns the hand-written (or any other) font into Normal', () => {
+    for (const family of [5, 1, 3, 7]) {
+      expect((normalizeStyle(text(family)) as SyncedElement & { fontFamily: number }).fontFamily).toBe(FONT_NORMAL);
+    }
+  });
+});
+
+describe('enforceBoardStyle', () => {
+  it('writes the normalized scene back (text re-measured) only when something changed', () => {
+    const api = { updateScene: vi.fn(), getSceneElementsIncludingDeleted: () => [], getAppState: () => ({}) };
+    const fns = { reconcileElements: vi.fn(), restoreElements: vi.fn(), refreshTextDimensions: vi.fn((els) => els), captureNever: 'NEVER' };
+    expect(enforceBoardStyle([rect()], api, fns)).toEqual([rect()]);
+    expect(api.updateScene).not.toHaveBeenCalled();
+
+    const out = enforceBoardStyle([rect(), text(5)], api, fns);
+    expect((out[1] as SyncedElement & { fontFamily: number }).fontFamily).toBe(FONT_NORMAL);
+    expect(fns.refreshTextDimensions).toHaveBeenCalledWith([out[1]]);
+    expect(api.updateScene).toHaveBeenCalledWith({ elements: out, captureUpdate: 'NEVER' });
+  });
+});
+```
+
+`swint-library.spec.ts`:
+```ts
+import { describe, expect, it } from 'vitest';
+import { isSupportedElementType } from '@swint/shared-collab-protocol';
+import { ALLOWED_FONT_FAMILIES, CLEAN_ROUGHNESS } from '../board-style.js';
+import { isSwintLibrary, SWINT_LIBRARY } from './swint-library.js';
+
+describe('SWINT_LIBRARY', () => {
+  it('has the agreed vendor-neutral items, each with a unique id and name', () => {
+    expect(SWINT_LIBRARY.map((i) => i.name)).toEqual([
+      'Client', 'Mobile app', 'User', 'DNS', 'CDN', 'Load balancer', 'API gateway', 'Service', 'Worker',
+      'Database', 'Cache', 'Queue', 'Pub/Sub topic', 'Object storage', 'Search index', 'External service', 'Region',
+    ]);
+    expect(new Set(SWINT_LIBRARY.map((i) => i.id)).size).toBe(SWINT_LIBRARY.length);
+  });
+
+  it('only uses board-legal elements: supported types, clean lines, Normal/Code fonts, grouped per item', () => {
+    for (const item of SWINT_LIBRARY) {
+      for (const e of item.elements) {
+        expect(isSupportedElementType(e.type)).toBe(true);
+        expect(e.roughness).toBe(CLEAN_ROUGHNESS);
+        if (e.type === 'text') expect(ALLOWED_FONT_FAMILIES).toContain(e.fontFamily);
+        expect(e.groupIds).toEqual([item.id]);
+      }
+    }
+  });
+
+  it('stays small (it ships in the board chunk)', () => {
+    expect(JSON.stringify(SWINT_LIBRARY).length).toBeLessThan(150_000);
+  });
+
+  it('isSwintLibrary recognises exactly our items', () => {
+    expect(isSwintLibrary(SWINT_LIBRARY)).toBe(true);
+    expect(isSwintLibrary([...SWINT_LIBRARY, { id: 'extra' }])).toBe(false);
+    expect(isSwintLibrary(SWINT_LIBRARY.slice(1))).toBe(false);
+  });
+});
+```
+
+Append to `excalidraw-binding.spec.ts` (also add `refreshTextDimensions: (els) => els,` to that file's `fns` object):
+```ts
+describe('board style', () => {
+  it('syncs local elements with clean lines and the Normal font, and fixes the local scene', () => {
+    const { b, flush, sched, apiA, bindA } = setup();
+    bindA.handleChange([el('r', 1, { roughness: 2 } as never), el('t', 1, { type: 'text', fontFamily: 5 } as never)], {});
+    sched.frame();
+    flush();
+    const synced = getBoardElements(b);
+    expect((synced.get('r') as unknown as { roughness: number }).roughness).toBe(0);
+    expect((synced.get('t') as unknown as { fontFamily: number }).fontFamily).toBe(6);
+    const written = apiA.updateScene.mock.calls.filter(([s]) => 'elements' in (s as object));
+    expect(written).toHaveLength(1);
+  });
+});
+```
+
+Append to `collaborative-board.spec.tsx` (add `updateLibrary: vi.fn()` to the mocked `api` object, and add `vi.mock('./collaborative-board.css', () => ({}))` if Task 6 didn't):
+```ts
+  it('starts with the Normal font, clean lines and our library, and keeps the library fixed', async () => {
+    const { SWINT_LIBRARY } = await import('../library/swint-library.js');
+    render(<CollaborativeBoard doc={new Y.Doc()} awareness={null} readOnly={false} />);
+    const initialData = lastProps['initialData'] as { appState: Record<string, unknown>; libraryItems: unknown };
+    expect(initialData.appState).toMatchObject({ currentItemFontFamily: 6, currentItemRoughness: 0 });
+    expect(initialData.libraryItems).toBe(SWINT_LIBRARY);
+    act(() => {
+      (lastProps['onLibraryChange'] as (items: unknown[]) => void)([...SWINT_LIBRARY, { id: 'mine' }]);
+    });
+    expect(api.updateLibrary).toHaveBeenCalledWith({ libraryItems: SWINT_LIBRARY, merge: false });
+    api.updateLibrary.mockClear();
+    act(() => {
+      (lastProps['onLibraryChange'] as (items: unknown[]) => void)(SWINT_LIBRARY);
+    });
+    expect(api.updateLibrary).not.toHaveBeenCalled();
+  });
+```
+
+- [ ] **Step 2: Run the tests and confirm they fail**
+
+Run: `pnpm nx test web-ui-whiteboard`. Expected: FAIL (modules missing).
+
+- [ ] **Step 3: Implement `board-style.ts`**
+
+```ts
+import type { SyncedElement } from '@swint/shared-collab-protocol';
+import type { ExcalidrawFns, SceneApi } from './binding/excalidraw-binding.js';
+
+/** Excalidraw 0.18.1 FONT_FAMILY ids (hard-coded: importing them would load the Excalidraw bundle in jsdom). */
+export const FONT_NORMAL = 6; // Nunito ("Normal")
+export const FONT_CODE = 8; // Comic Shanns ("Code")
+export const ALLOWED_FONT_FAMILIES: readonly number[] = [FONT_NORMAL, FONT_CODE];
+/** Sloppiness "Architect": clean, straight lines. */
+export const CLEAN_ROUGHNESS = 0;
+
+/** Defaults for new elements on every board (collaborative and template editor). */
+export const BOARD_APP_STATE = { currentItemFontFamily: FONT_NORMAL, currentItemRoughness: CLEAN_ROUGHNESS } as const;
+
+type Styled = SyncedElement & { type?: string; roughness?: number; fontFamily?: number };
+
+/** Brings one element to the board style. Returns the same object when it already conforms. */
+export function normalizeStyle(element: SyncedElement): SyncedElement {
+  const e = element as Styled;
+  const badLines = typeof e.roughness === 'number' && e.roughness !== CLEAN_ROUGHNESS;
+  const badFont = e.type === 'text' && !ALLOWED_FONT_FAMILIES.includes(e.fontFamily ?? -1);
+  if (!badLines && !badFont) return element;
+  return {
+    ...e,
+    ...(badLines ? { roughness: CLEAN_ROUGHNESS } : {}),
+    ...(badFont ? { fontFamily: FONT_NORMAL } : {}),
+    // A real edit: peers must see a newer version.
+    version: e.version + 1,
+    versionNonce: Math.floor(Math.random() * 2 ** 31),
+  } as SyncedElement;
+}
+
+/**
+ * Normalizes `scene`. When anything changed, re-measures the changed text (fonts have different metrics), writes the
+ * result back to Excalidraw without an undo entry, and returns it; otherwise returns `scene` unchanged.
+ * Pasted content, old templates and other clients' defaults all pass through here.
+ */
+export function enforceBoardStyle(scene: readonly SyncedElement[], api: SceneApi, fns: ExcalidrawFns): readonly SyncedElement[] {
+  const normalized = scene.map(normalizeStyle);
+  const changed = normalized.filter((e, i) => e !== scene[i]);
+  if (changed.length === 0) return scene;
+  const changedText = changed.filter((e) => (e as Styled).type === 'text');
+  const refreshed = new Map(fns.refreshTextDimensions(changedText).map((e) => [e.id, e]));
+  const result = normalized.map((e) => refreshed.get(e.id) ?? e);
+  api.updateScene({ elements: result, captureUpdate: fns.captureNever });
+  return result;
+}
+```
+
+- [ ] **Step 4: Use it in the binding and both editors**
+
+`excalidraw-binding.ts`:
+- add `refreshTextDimensions(elements: readonly SyncedElement[]): readonly SyncedElement[];` to `ExcalidrawFns`;
+- add `updateLibrary?(opts: { libraryItems: unknown; merge: boolean }): unknown;` to `SceneApi`;
+- in `flush`, after the unsupported-element block from Task 6 and before `this.sync.pushLocal(scene)`, add `scene = enforceBoardStyle(scene, this.o.api, this.o.fns);`. Import it from `../board-style.js`.
+
+`collaborative-board.tsx`:
+- add `refreshTextDimensions: (elements) => restoreElements(elements as never, null, { refreshDimensions: true, repairBindings: false }) as unknown as readonly SyncedElement[],` to `excalidrawFns`;
+- import `BOARD_APP_STATE` from `../board-style.js` and `{ isSwintLibrary, SWINT_LIBRARY }` from `../library/swint-library.js`;
+- add these props to `<Excalidraw …>`:
+```tsx
+        initialData={{ appState: BOARD_APP_STATE, libraryItems: SWINT_LIBRARY as never }}
+        // The library is ours and fixed: any addition, import or removal is undone right away.
+        onLibraryChange={(items) => {
+          if (!isSwintLibrary(items)) void api?.updateLibrary({ libraryItems: SWINT_LIBRARY as never, merge: false });
+        }}
+```
+
+`collaborative-board.css`, appended:
+```css
+/* Board style: Normal and Code fonts only, clean lines only. */
+.swint-board [data-testid='font-family-hand-drawn'],
+.swint-board [data-testid='font-family-show-fonts'],
+.swint-board fieldset:has(input[name='sloppiness']) {
+  display: none;
+}
+
+/* The library is fixed: no browsing, import/export/reset/publish, or adding to it. */
+.swint-board .library-menu-browse-button,
+.swint-board .library-menu-dropdown-container,
+.swint-board li[data-testid='addToLibrary'] {
+  display: none;
+}
+```
+If Excalidraw 0.18.1 renders the sloppiness buttons without `input[name='sloppiness']`, use the selector the DOM actually has (look in the e2e trace from Step 7, or in the bundle near `group:"sloppiness"`). Keep the rule scoped to that fieldset only.
+
+`seed-board-editor.tsx` (the template editor gets the same look):
+```tsx
+import { useState } from 'react';
+import { Excalidraw } from '@excalidraw/excalidraw';
+import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
+import '@excalidraw/excalidraw/index.css';
+import './collaborative-board.css';
+import type { SyncedElement } from '@swint/shared-collab-protocol';
+import { isSupportedElementType } from '@swint/shared-collab-protocol';
+import type { SceneApi } from '../binding/excalidraw-binding.js';
+import { BOARD_APP_STATE, enforceBoardStyle } from '../board-style.js';
+import { isSwintLibrary, SWINT_LIBRARY } from '../library/swint-library.js';
+import { excalidrawFns } from './collaborative-board.js';
+```
+- keep `SeedBoardEditorProps`;
+- in the component, add `const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);`;
+- the wrapper gets `className="swint-board h-[420px] w-full overflow-hidden rounded-md border border-slate-300"`;
+- the Excalidraw props become:
+```tsx
+        excalidrawAPI={setApi}
+        initialData={{ elements: initialElements as never, appState: BOARD_APP_STATE, libraryItems: SWINT_LIBRARY as never }}
+        UIOptions={{ tools: { image: false } }}
+        onLibraryChange={(items) => {
+          if (!isSwintLibrary(items)) void api?.updateLibrary({ libraryItems: SWINT_LIBRARY as never, merge: false });
+        }}
+        onChange={(elements) => {
+          const live = (elements as unknown as readonly SyncedElement[]).filter((e) => !e.isDeleted && isSupportedElementType((e as { type?: unknown }).type));
+          const styled = api ? enforceBoardStyle(live, api as unknown as SceneApi, excalidrawFns) : live;
+          onChange(styled.map((e) => structuredClone(e)));
+        }}
+```
+
+In `src/index.ts`, add `export * from './lib/board-style.js';` and `export * from './lib/library/swint-library.js';`.
+
+`apps/api/src/app/dev-seed.ts`: change `roughness: 1` to `roughness: 0` and `fontFamily: 5` to `fontFamily: 6`. The demo template then matches the board style. Its spec keeps passing; if it asserts those literals, update them.
+
+- [ ] **Step 5: Implement the library**
+
+`library/swint-library.ts`. Every item is a group of plain shapes plus a label, all with clean lines and the Normal font. Excalidraw assigns fresh element ids and fractional indexes when an item is inserted.
+```ts
+import type { LibraryItem } from '@excalidraw/excalidraw/types';
+import { CLEAN_ROUGHNESS, FONT_NORMAL } from '../board-style.js';
+
+type Shape = 'rectangle' | 'ellipse' | 'diamond' | 'line' | 'text';
+interface Spec { type: Shape; x: number; y: number; w: number; h: number; extra?: Record<string, unknown> }
+export type LibraryItemData = Omit<LibraryItem, 'elements'> & { elements: (Record<string, unknown> & { type: Shape; roughness: number; groupIds: string[]; fontFamily?: number })[] };
+
+const INK = '#1e1e1e';
+
+function element(itemId: string, n: number, s: Spec) {
+  return {
+    id: `${itemId}-${n}`,
+    type: s.type,
+    x: s.x,
+    y: s.y,
+    width: s.w,
+    height: s.h,
+    angle: 0,
+    strokeColor: INK,
+    backgroundColor: 'transparent',
+    fillStyle: 'solid',
+    strokeWidth: 2,
+    strokeStyle: 'solid',
+    roughness: CLEAN_ROUGHNESS,
+    opacity: 100,
+    groupIds: [itemId],
+    frameId: null,
+    roundness: null,
+    seed: 1 + n,
+    version: 1,
+    versionNonce: 1 + n,
+    isDeleted: false,
+    boundElements: null,
+    updated: 0,
+    link: null,
+    locked: false,
+    ...s.extra,
+  };
+}
+
+const label = (text: string, x: number, y: number, w: number): Spec => ({
+  type: 'text', x, y, w, h: 20,
+  extra: { text, originalText: text, fontSize: 16, fontFamily: FONT_NORMAL, textAlign: 'center', verticalAlign: 'top', containerId: null, autoResize: true, lineHeight: 1.25 },
+});
+const line = (x: number, y: number, dx: number, dy: number, extra: Record<string, unknown> = {}): Spec => ({
+  type: 'line', x, y, w: Math.abs(dx), h: Math.abs(dy), extra: { points: [[0, 0], [dx, dy]], lastCommittedPoint: null, startBinding: null, endBinding: null, startArrowhead: null, endArrowhead: null, ...extra },
+});
+const fill = (color: string) => ({ backgroundColor: color, fillStyle: 'solid' });
+const rounded = { roundness: { type: 3 } };
+const dashed = { strokeStyle: 'dashed' };
+
+function item(name: string, specs: Spec[]): LibraryItemData {
+  const id = `swint-${name.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+  return { id, name, status: 'published', created: 0, elements: specs.map((s, n) => element(id, n, s)) as LibraryItemData['elements'] };
+}
+
+/** The fixed, vendor-neutral system-design library offered on every board. */
+export const SWINT_LIBRARY: LibraryItemData[] = [
+  item('Client', [{ type: 'rectangle', x: 0, y: 0, w: 140, h: 90, extra: rounded }, line(0, 20, 140, 0), label('Client', 0, 45, 140)]),
+  item('Mobile app', [{ type: 'rectangle', x: 0, y: 0, w: 60, h: 100, extra: rounded }, line(22, 88, 16, 0), label('Mobile app', -30, 108, 120)]),
+  item('User', [{ type: 'ellipse', x: 20, y: 0, w: 40, h: 40 }, { type: 'ellipse', x: 0, y: 44, w: 80, h: 50 }, label('User', -10, 100, 100)]),
+  item('DNS', [{ type: 'rectangle', x: 0, y: 0, w: 120, h: 60, extra: { ...rounded, ...fill('#e7f5ff') } }, label('DNS', 0, 20, 120)]),
+  item('CDN', [{ type: 'ellipse', x: 0, y: 0, w: 140, h: 80, extra: fill('#e7f5ff') }, label('CDN', 0, 30, 140)]),
+  item('Load balancer', [{ type: 'diamond', x: 0, y: 0, w: 120, h: 100, extra: fill('#fff4e6') }, label('Load balancer', -20, 108, 160)]),
+  item('API gateway', [{ type: 'rectangle', x: 0, y: 0, w: 160, h: 70, extra: { ...rounded, ...fill('#fff4e6') } }, { type: 'rectangle', x: 6, y: 6, w: 148, h: 58, extra: rounded }, label('API gateway', 0, 25, 160)]),
+  item('Service', [{ type: 'rectangle', x: 0, y: 0, w: 140, h: 70, extra: { ...rounded, ...fill('#ebfbee') } }, label('Service', 0, 25, 140)]),
+  item('Worker', [{ type: 'rectangle', x: 0, y: 0, w: 140, h: 70, extra: { ...rounded, ...dashed, ...fill('#ebfbee') } }, label('Worker', 0, 25, 140)]),
+  item('Database', [
+    { type: 'rectangle', x: 0, y: 15, w: 120, h: 80, extra: fill('#f3f0ff') },
+    { type: 'ellipse', x: 0, y: 0, w: 120, h: 30, extra: fill('#f3f0ff') },
+    { type: 'ellipse', x: 0, y: 80, w: 120, h: 30, extra: fill('#f3f0ff') },
+    label('Database', 0, 45, 120),
+  ]),
+  item('Cache', [{ type: 'rectangle', x: 0, y: 0, w: 120, h: 70, extra: { ...rounded, ...fill('#fff9db') } }, label('Cache', 0, 25, 120)]),
+  item('Queue', [{ type: 'rectangle', x: 0, y: 0, w: 180, h: 50, extra: fill('#fff0f6') }, line(45, 0, 0, 50), line(90, 0, 0, 50), line(135, 0, 0, 50), label('Queue', 0, 58, 180)]),
+  item('Pub/Sub topic', [{ type: 'ellipse', x: 0, y: 0, w: 150, h: 70, extra: fill('#fff0f6') }, line(150, 35, 40, -25, { endArrowhead: 'arrow' }), line(150, 35, 40, 25, { endArrowhead: 'arrow' }), label('Pub/Sub topic', 0, 25, 150)]),
+  item('Object storage', [{ type: 'rectangle', x: 0, y: 0, w: 130, h: 90, extra: fill('#f8f9fa') }, line(0, 0, 130, 0, { strokeWidth: 4 }), label('Object storage', -5, 35, 140)]),
+  item('Search index', [{ type: 'rectangle', x: 0, y: 0, w: 140, h: 70, extra: { ...rounded, ...fill('#f3f0ff') } }, { type: 'ellipse', x: 100, y: 10, w: 24, h: 24 }, line(120, 32, 10, 12), label('Search index', 0, 40, 140)]),
+  item('External service', [{ type: 'rectangle', x: 0, y: 0, w: 160, h: 70, extra: { ...rounded, ...dashed } }, label('External service', 0, 25, 160)]),
+  item('Region', [{ type: 'rectangle', x: 0, y: 0, w: 360, h: 240, extra: { ...dashed, ...rounded } }, label('Region', 10, 8, 80)]),
+];
+
+/** True when `items` is exactly our library (same ids), i.e. the user has not added, imported or removed anything. */
+export function isSwintLibrary(items: readonly { id: string }[]): boolean {
+  if (items.length !== SWINT_LIBRARY.length) return false;
+  const ours = new Set(SWINT_LIBRARY.map((i) => i.id));
+  return items.every((i) => ours.has(i.id));
+}
+```
+If `LibraryItem` is not exported from `@excalidraw/excalidraw/types` in 0.18.1, define `LibraryItemData` as `{ id: string; name: string; status: 'published'; created: number; elements: … }` with no import. Excalidraw restores library elements, filling missing fields, when it loads `initialData.libraryItems`.
+
+- [ ] **Step 6: Run the unit tests**
+
+Run: `pnpm nx run-many -t test lint typecheck -p web-ui-whiteboard web-feature-template-editor web-feature-session-room api`. Expected: PASS.
+
+- [ ] **Step 7: E2E — the board looks and behaves as agreed**
+
+`apps/web-e2e/src/board-look.spec.ts`:
+```ts
+import { expect, test } from '@playwright/test';
+import { signInAsInterviewer } from './support/auth.js';
+import { createSession, uniqueCandidate } from './support/sessions.js';
+
+test('the board offers Normal/Code fonts only, clean lines only, and a fixed library', async ({ page }) => {
+  await signInAsInterviewer(page);
+  const session = await createSession(page, uniqueCandidate());
+  await page.goto(session.roomPath);
+  await page.getByRole('button', { name: 'Start interview' }).click();
+  const board = page.getByTestId('board');
+  await expect(board).toBeVisible();
+
+  // Text tool: the font picker shows Normal and Code, not the hand-written font or "more fonts".
+  await page.getByTestId('toolbar-text').click();
+  await expect(board.getByTestId('font-family-normal')).toBeVisible();
+  await expect(board.getByTestId('font-family-code')).toBeVisible();
+  await expect(board.getByTestId('font-family-hand-drawn')).toBeHidden();
+  await expect(board.getByTestId('font-family-show-fonts')).toBeHidden();
+
+  // Rectangle tool: no sloppiness control.
+  await page.getByTestId('toolbar-rectangle').click();
+  await expect(board.getByText('Sloppiness')).toBeHidden();
+
+  // Library: our items, no browsing or library menu.
+  await board.getByTestId('default-sidebar-trigger').click();
+  await expect(board.getByText('Load balancer')).toBeVisible();
+  await expect(board.locator('.library-menu-browse-button')).toBeHidden();
+  await expect(board.locator('.library-menu-dropdown-container')).toBeHidden();
+});
+```
+Library previews in 0.18.1 may not render item names as text. If `getByText('Load balancer')` doesn't match, assert the number of library units instead: inspect the trace for the unit selector and expect 17. Keep the intent: our 17 items are there, and the browse button and library menu are not.
+
+Run: `pnpm nx e2e web-e2e`. Expected: all specs pass (Tasks 11–12 plus this one).
+
+- [ ] **Step 8: Full verification and commit**
+
+```bash
+pnpm nx run-many -t lint test typecheck build && pnpm nx format:check --all
+pnpm nx format:write --uncommitted
+git add libs/web/ui-whiteboard apps/api/src/app/dev-seed.ts apps/web-e2e
+git commit -m "feat(web-ui-whiteboard): Normal/Code fonts only, clean lines, fixed vendor-neutral library"
+```
+
+---
+
 ## Spec and carry-forward coverage
 
 | Requirement | Task |
@@ -2438,3 +2874,4 @@ git commit -m "test(web-e2e): connection contract (invite revoked, cancel, sign-
 | Plan 4: self-hosted Excalidraw fonts | 7 (served), 10 (nginx), 11 (asserted, no foreign requests) |
 | Plan 4 polish: archive failure, not_started backoff, generator leftovers (.babelrc, README stubs, nx.json babel, extensionless import), `useNow` after end, NotesEditor `user` changes | 7 (import), 8 |
 | Plan 3: orphaned S3 seeds, session-read performance | Deferred (Global Constraints) |
+| Product decision 2026-11-09: no hand-written font (Normal = Nunito, Code = Comic Shanns), clean lines only, fixed vendor-neutral library | 13 |
