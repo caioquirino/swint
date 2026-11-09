@@ -16,6 +16,12 @@ export interface OidcClient {
 
 export interface OidcSettings {
   issuer: string;
+  /**
+   * Origin the API uses to reach the issuer when it differs from the one browsers use (e.g. http://keycloak:8080
+   * inside Docker while browsers use http://localhost:8080). Only fetched requests are rewritten; the authorize
+   * and end-session URLs are built for the browser and keep the public issuer origin.
+   */
+  internalUrl?: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
@@ -24,20 +30,28 @@ export interface OidcSettings {
   allowInsecureHttp: boolean;
 }
 
+/** A customFetch that sends requests for the issuer's public origin to `internalUrl`'s origin instead. */
+export function backchannelFetch(issuer: string, internalUrl: string, fetchImpl: typeof fetch = (u, i) => fetch(u, i)): client.CustomFetch {
+  const from = new URL(issuer).origin;
+  const to = new URL(internalUrl).origin;
+  return (url, options) => {
+    const target = new URL(url);
+    const href = target.origin === from ? new URL(target.pathname + target.search, to).href : url;
+    return fetchImpl(href, options as RequestInit);
+  };
+}
+
 export function createOidcClient(settings: OidcSettings): OidcClient {
   let configPromise: Promise<client.Configuration> | null = null;
 
   /** Lazy discovery: Keycloak may still be starting when the API boots. Failed attempts are retried on next use. */
   function config(): Promise<client.Configuration> {
     if (!configPromise) {
+      const options: client.DiscoveryRequestOptions = {};
+      if (settings.allowInsecureHttp) options.execute = [client.allowInsecureRequests];
+      if (settings.internalUrl) options[client.customFetch] = backchannelFetch(settings.issuer, settings.internalUrl);
       configPromise = client
-        .discovery(
-          new URL(settings.issuer),
-          settings.clientId,
-          settings.clientSecret,
-          undefined,
-          settings.allowInsecureHttp ? { execute: [client.allowInsecureRequests] } : undefined,
-        )
+        .discovery(new URL(settings.issuer), settings.clientId, settings.clientSecret, undefined, options)
         .catch((e) => {
           configPromise = null;
           throw e;

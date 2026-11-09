@@ -54,4 +54,9 @@ describe('loadConfig', () => {
     expect(loadConfig({ NODE_ENV: 'development', SEED_DEV_DATA: 'false' }).seedDevData).toBe(false);
     expect(loadConfig({ NODE_ENV: 'test', SEED_DEV_DATA: 'true' }).seedDevData).toBe(true);
   });
+
+  it('reads OIDC_INTERNAL_URL (optional, trailing slash removed)', () => {
+    expect(loadConfig({ NODE_ENV: 'test' }).oidcInternalUrl).toBeUndefined();
+    expect(loadConfig({ NODE_ENV: 'test', OIDC_INTERNAL_URL: 'http://keycloak:8080/' }).oidcInternalUrl).toBe('http://keycloak:8080');
+  });
 });

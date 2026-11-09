@@ -93,110 +93,121 @@ export async function createApp(
   };
   const { raw, doc } = createDynamo(aws);
   const s3 = createS3(aws);
-  if (config.ensureInfra) {
-    await ensureTable(raw, config.tableName);
-    await ensureBucket(s3, config.bucketName);
-  }
-  const table = { doc, name: config.tableName };
-  const repos: AppRepos = {
-    users: createUsersRepo(table),
-    authSessions: createAuthSessionsRepo(table),
-    templates: createTemplatesRepo(table),
-    sessions: createSessionsRepo(table),
-    invites: createInvitesRepo(table),
-    blobs: createBlobStore(s3, config.bucketName),
-  };
-  const clock = systemClock;
-  let devSeedResult: 'created' | 'exists' | undefined;
-  if (config.seedDevData) {
-    devSeedResult = await seedDevData({
-      templates: repos.templates,
-      blobs: repos.blobs,
+  let server: FastifyInstance | undefined;
+  try {
+    if (config.ensureInfra) {
+      await ensureTable(raw, config.tableName);
+      await ensureBucket(s3, config.bucketName);
+    }
+    const table = { doc, name: config.tableName };
+    const repos: AppRepos = {
+      users: createUsersRepo(table),
+      authSessions: createAuthSessionsRepo(table),
+      templates: createTemplatesRepo(table),
+      sessions: createSessionsRepo(table),
+      invites: createInvitesRepo(table),
+      blobs: createBlobStore(s3, config.bucketName),
+    };
+    const clock = systemClock;
+    let devSeedResult: 'created' | 'exists' | undefined;
+    if (config.seedDevData) {
+      devSeedResult = await seedDevData({
+        templates: repos.templates,
+        blobs: repos.blobs,
+        clock,
+        newId: ulidIds,
+        orgId: config.defaultOrgId,
+      });
+    }
+    const secureCookies = config.nodeEnv === 'production';
+    const oidc =
+      overrides.oidc ??
+      createOidcClient({
+        issuer: config.oidcIssuer,
+        internalUrl: config.oidcInternalUrl,
+        clientId: config.oidcClientId,
+        clientSecret: config.oidcClientSecret,
+        redirectUri: `${config.publicBaseUrl}/auth/callback`,
+        postLogoutRedirectUri: `${config.publicBaseUrl}/`,
+        allowInsecureHttp: config.oidcIssuer.startsWith('http://'),
+      });
+
+    // The collab server needs the Fastify logger, which only exists after buildServer; the router gets a
+    // forwarding SessionEvents whose target is set as soon as collab exists (before the server is ready).
+    const eventsTarget: { current?: SessionEvents } = {};
+    const forwardingEvents: SessionEvents = {
+      sessionChanged: async (rec) => {
+        await eventsTarget.current?.sessionChanged(rec);
+      },
+    };
+    const resolveIdentityFromCookieHeader = createCookieIdentityResolver({ ...repos, clock, cookieSecret: config.cookieSecret });
+
+    const router = buildRouter({
+      ...repos,
       clock,
       newId: ulidIds,
-      orgId: config.defaultOrgId,
-    });
-  }
-  const secureCookies = config.nodeEnv === 'production';
-  const oidc =
-    overrides.oidc ??
-    createOidcClient({
-      issuer: config.oidcIssuer,
-      clientId: config.oidcClientId,
-      clientSecret: config.oidcClientSecret,
-      redirectUri: `${config.publicBaseUrl}/auth/callback`,
-      postLogoutRedirectUri: `${config.publicBaseUrl}/`,
-      allowInsecureHttp: config.oidcIssuer.startsWith('http://'),
+      newToken: randomToken,
+      publicBaseUrl: config.publicBaseUrl,
+      events: forwardingEvents,
     });
 
-  // The collab server needs the Fastify logger, which only exists after buildServer; the router gets a
-  // forwarding SessionEvents whose target is set as soon as collab exists (before the server is ready).
-  const eventsTarget: { current?: SessionEvents } = {};
-  const forwardingEvents: SessionEvents = {
-    sessionChanged: async (rec) => {
-      await eventsTarget.current?.sessionChanged(rec);
-    },
-  };
-  const resolveIdentityFromCookieHeader = createCookieIdentityResolver({ ...repos, clock, cookieSecret: config.cookieSecret });
+    server = await buildServer({
+      config,
+      router,
+      resolveIdentity: createIdentityResolver({ ...repos, clock }),
+      ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
+      registerRoutes: (app) => {
+        registerAuthRoutes(app, {
+          oidc,
+          users: repos.users,
+          authSessions: repos.authSessions,
+          clock,
+          publicBaseUrl: config.publicBaseUrl,
+          secureCookies,
+          defaultOrgId: config.defaultOrgId,
+        });
+        registerJoinRoute(app, { invites: repos.invites, sessions: repos.sessions, clock, secureCookies });
+      },
+    });
+    const collab = createCollabServer({
+      sessions: repos.sessions,
+      blobs: repos.blobs,
+      resolveIdentity: resolveIdentityFromCookieHeader,
+      clock,
+      logger: collabLogger(server.log.child({ component: 'collab' })),
+    });
+    eventsTarget.current = composeEvents(server.log, collab.events, overrides.events);
+    // The upgrade listener must exist before listen().
+    collab.attach(server.server);
+    if (devSeedResult) server.log.info({ result: devSeedResult }, 'dev seed');
+    await server.ready();
 
-  const router = buildRouter({
-    ...repos,
-    clock,
-    newId: ulidIds,
-    newToken: randomToken,
-    publicBaseUrl: config.publicBaseUrl,
-    events: forwardingEvents,
-  });
-
-  const server = await buildServer({
-    config,
-    router,
-    resolveIdentity: createIdentityResolver({ ...repos, clock }),
-    ...(overrides.logStream ? { logStream: overrides.logStream } : {}),
-    registerRoutes: (app) => {
-      registerAuthRoutes(app, {
-        oidc,
-        users: repos.users,
-        authSessions: repos.authSessions,
-        clock,
-        publicBaseUrl: config.publicBaseUrl,
-        secureCookies,
-        defaultOrgId: config.defaultOrgId,
-      });
-      registerJoinRoute(app, { invites: repos.invites, sessions: repos.sessions, clock, secureCookies });
-    },
-  });
-  const collab = createCollabServer({
-    sessions: repos.sessions,
-    blobs: repos.blobs,
-    resolveIdentity: resolveIdentityFromCookieHeader,
-    clock,
-    logger: collabLogger(server.log.child({ component: 'collab' })),
-  });
-  eventsTarget.current = composeEvents(server.log, collab.events, overrides.events);
-  // The upgrade listener must exist before listen().
-  collab.attach(server.server);
-  if (devSeedResult) server.log.info({ result: devSeedResult }, 'dev seed');
-  await server.ready();
-
-  return {
-    server,
-    repos,
-    resolveIdentityFromCookieHeader,
-    collab,
-    close: async () => {
-      // Flush collab documents while S3 is still reachable (bounded by collab's own shutdown deadline).
-      // HTTP and the AWS clients are closed even if an earlier step fails.
-      try {
-        await collab.close();
-      } finally {
+    const started = server;
+    return {
+      server: started,
+      repos,
+      resolveIdentityFromCookieHeader,
+      collab,
+      close: async () => {
+        // Flush collab documents while S3 is still reachable (bounded by collab's own shutdown deadline).
+        // HTTP and the AWS clients are closed even if an earlier step fails.
         try {
-          await server.close();
+          await collab.close();
         } finally {
-          raw.destroy();
-          s3.destroy();
+          try {
+            await started.close();
+          } finally {
+            raw.destroy();
+            s3.destroy();
+          }
         }
-      }
-    },
-  };
+      },
+    };
+  } catch (err) {
+    // Startup failed (e.g. DynamoDB unreachable during ensureTable): release what was opened, then rethrow.
+    await server?.close().catch(() => undefined);
+    raw.destroy();
+    s3.destroy();
+    throw err;
+  }
 }
