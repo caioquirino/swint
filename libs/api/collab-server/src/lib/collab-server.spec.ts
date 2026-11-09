@@ -457,3 +457,33 @@ describe('collab server: presence', () => {
     observer.destroy();
   });
 });
+
+describe('collab server: document size cap', () => {
+  it('makes a connection read-only once its writes would push the document past the cap; others keep writing', async () => {
+    const s = await setup('live', { maxDocumentBytes: 4096 });
+    const a = connectClient(kit, docName.board(s.id), 'ada');
+    const b = connectClient(kit, docName.board(s.id), 'bo');
+    await Promise.all([a.synced, b.synced]);
+
+    getBoardElements(a.doc).set('small', { id: 'small', version: 1, versionNonce: 1, index: 'a0', isDeleted: false });
+    await expect.poll(() => getBoardElements(b.doc).get('small')?.version).toBe(1);
+
+    getBoardElements(a.doc).set('big', {
+      id: 'big',
+      version: 1,
+      versionNonce: 1,
+      index: 'a1',
+      isDeleted: false,
+      text: 'x'.repeat(8192),
+    } as never);
+    getBoardElements(a.doc).set('after', { id: 'after', version: 1, versionNonce: 1, index: 'a2', isDeleted: false });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(getBoardElements(b.doc).get('big')).toBeUndefined();
+    expect(getBoardElements(b.doc).get('after')).toBeUndefined();
+
+    getBoardElements(b.doc).set('fromB', { id: 'fromB', version: 1, versionNonce: 1, index: 'a3', isDeleted: false });
+    await expect.poll(() => getBoardElements(a.doc).get('fromB')?.version).toBe(1);
+    a.destroy();
+    b.destroy();
+  });
+});

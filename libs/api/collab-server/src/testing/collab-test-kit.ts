@@ -36,7 +36,10 @@ const silentLogger: CollabLogger = { debug: () => undefined, info: () => undefin
 
 export async function startCollabTestKit(
   opts: Partial<
-    Pick<CollabServerDeps, 'debounceMs' | 'maxDebounceMs' | 'checkpointIntervalMs' | 'sleep' | 'storeRetryMs' | 'shutdownTimeoutMs'>
+    Pick<
+      CollabServerDeps,
+      'debounceMs' | 'maxDebounceMs' | 'checkpointIntervalMs' | 'sleep' | 'storeRetryMs' | 'shutdownTimeoutMs' | 'maxDocumentBytes'
+    >
   > & {
     now?: () => number;
     /** Reuse existing stores (simulates a server restart over the same table and bucket). */
@@ -92,6 +95,7 @@ export async function startCollabTestKit(
     debounceMs: opts.debounceMs,
     maxDebounceMs: opts.maxDebounceMs,
     checkpointIntervalMs: opts.checkpointIntervalMs,
+    maxDocumentBytes: opts.maxDocumentBytes,
   });
   const http = createServer();
   collab.attach(http);

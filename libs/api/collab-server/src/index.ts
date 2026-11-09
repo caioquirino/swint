@@ -6,3 +6,4 @@ export * from './lib/types.js';
 export * from './lib/doc-store.js';
 export * from './lib/rate-limit.js';
 export * from './lib/still-authorized.js';
+export * from './lib/doc-size-guard.js';

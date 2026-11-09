@@ -11,6 +11,7 @@ import { CollabAccessError, authorizeDocument, targetOf, type DocTarget } from '
 import { dropForeignClients } from './awareness-ownership.js';
 import { presenceIdentity } from './presence.js';
 import { createDocStore } from './doc-store.js';
+import { createDocSizeGuard, MAX_DOCUMENT_BYTES } from './doc-size-guard.js';
 import type { CollabContext, CollabLogger } from './types.js';
 import { sessionStateMessage } from './session-state.js';
 import { attachUpgradeHandler, type UpgradeHandle } from './upgrade.js';
@@ -40,6 +41,8 @@ export interface CollabServerDeps {
   pingIntervalMs?: number;
   revalidateIntervalMs?: number;
   messageRate?: { ratePerSec: number; burst: number };
+  /** Default MAX_DOCUMENT_BYTES. */
+  maxDocumentBytes?: number;
 }
 
 export interface CollabServer {
@@ -63,6 +66,11 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
   const { logger } = deps;
   const handles: UpgradeHandle[] = [];
   const docStore = createDocStore({ blobs: deps.blobs, logger, sleep: deps.sleep });
+  const maxDocumentBytes = deps.maxDocumentBytes ?? MAX_DOCUMENT_BYTES;
+  const sizeGuard = createDocSizeGuard(maxDocumentBytes, (name) => {
+    const d = hocuspocus.documents.get(name);
+    return d ? Y.encodeStateAsUpdate(d).byteLength : 0;
+  });
   // lastContext can be absent when a store fires after the last connection left; remember the org per document.
   const orgByDocument = new Map<string, string>();
   /** Documents whose last store failed; they must not be unloaded until a store succeeds. */
@@ -340,6 +348,7 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
     },
 
     async afterUnloadDocument({ documentName }) {
+      sizeGuard.forget(documentName);
       orgByDocument.delete(documentName);
       unsaved.delete(documentName);
       stopCheckpoints(documentName);
@@ -350,6 +359,18 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       const t = retryTimers.get(documentName);
       if (t) clearTimeout(t);
       retryTimers.delete(documentName);
+    },
+
+    async beforeHandleMessage({ documentName, update, connection }) {
+      if (connection.readOnly) return;
+      if (!sizeGuard.admit(documentName, update.byteLength)) {
+        // Read-only drops this message and later writes from this connection; others can still edit.
+        connection.readOnly = true;
+        logger.warn(
+          { sessionId: targetOf(documentName).sessionId, maxDocumentBytes },
+          'collab: document size cap reached; connection is now read-only',
+        );
+      }
     },
 
     async beforeHandleAwareness({ context, states, removedClients, document, connection }) {
