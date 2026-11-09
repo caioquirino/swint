@@ -19,6 +19,12 @@ services:
     command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-dbPath', '/home/dynamodblocal/data']
     # The image's default user cannot write to a fresh named volume (owned by root); DynamoDB Local must create its db file there.
     user: root
+    healthcheck:
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/8000']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     ports:
       - '127.0.0.1:8000:8000'
     volumes:
@@ -31,6 +37,12 @@ services:
     environment:
       COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: 'true'
       COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /data
+    healthcheck:
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/9090']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     ports:
       - '127.0.0.1:9090:9090'
     volumes:
@@ -52,7 +64,10 @@ services:
       S3_ENDPOINT: http://s3:9090
       ENSURE_INFRA: 'true'
       SEED_DEV_DATA: 'true'
-    depends_on: [keycloak, dynamodb, s3]
+    depends_on:
+      keycloak: { condition: service_started }
+      dynamodb: { condition: service_healthy }
+      s3: { condition: service_healthy }
     restart: unless-stopped
 
   web:
