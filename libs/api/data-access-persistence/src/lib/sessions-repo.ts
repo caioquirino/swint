@@ -35,9 +35,7 @@ export function createSessionsRepo(table: Table): SessionsRepo {
       );
     },
     async get(orgId, id) {
-      const out = await table.doc.send(
-        new GetCommand({ TableName: table.name, Key: { PK: `SESSION#${id}`, SK: 'META' } }),
-      );
+      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: { PK: `SESSION#${id}`, SK: 'META' } }));
       if (!out.Item || out.Item['orgId'] !== orgId) return null;
       return stripKeys(out.Item) as unknown as SessionRecord;
     },

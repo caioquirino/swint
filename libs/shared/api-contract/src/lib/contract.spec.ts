@@ -14,9 +14,7 @@ describe('contract', () => {
   });
 
   it('has exactly the agreed procedure set', () => {
-    const names = Object.entries(contract).flatMap(([group, procs]) =>
-      Object.keys(procs as object).map((p) => `${group}.${p}`),
-    );
+    const names = Object.entries(contract).flatMap(([group, procs]) => Object.keys(procs as object).map((p) => `${group}.${p}`));
     expect(names.sort()).toEqual(
       [
         'me.get',

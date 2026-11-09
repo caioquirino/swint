@@ -19,7 +19,13 @@ describe('NotesEditor', () => {
     const { a, b } = linkedDocs();
     let editor = null as Editor | null;
     render(
-      <NotesEditor doc={a} awarenessProvider={{ awareness: new Awareness(a) }} user={{ name: 'Ada', color: '#1971c2' }} readOnly={false} onEditor={(e) => (editor = e)} />,
+      <NotesEditor
+        doc={a}
+        awarenessProvider={{ awareness: new Awareness(a) }}
+        user={{ name: 'Ada', color: '#1971c2' }}
+        readOnly={false}
+        onEditor={(e) => (editor = e)}
+      />,
     );
     await act(async () => undefined);
     act(() => {
@@ -32,7 +38,13 @@ describe('NotesEditor', () => {
     const doc = new Y.Doc();
     let editor = null as Editor | null;
     render(
-      <NotesEditor doc={doc} awarenessProvider={{ awareness: new Awareness(doc) }} user={{ name: 'Ada', color: '#1971c2' }} readOnly onEditor={(e) => (editor = e)} />,
+      <NotesEditor
+        doc={doc}
+        awarenessProvider={{ awareness: new Awareness(doc) }}
+        user={{ name: 'Ada', color: '#1971c2' }}
+        readOnly
+        onEditor={(e) => (editor = e)}
+      />,
     );
     await act(async () => undefined);
     expect(editor?.isEditable).toBe(false);

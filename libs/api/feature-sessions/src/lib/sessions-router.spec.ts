@@ -75,9 +75,9 @@ describe('sessions router: create / get / list', () => {
     await expect(as(interviewer()).create({ templateId: 'nope', candidateName: 'Bo' })).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
-    await expect(
-      as(interviewer('other-org')).create({ templateId: 'tpl-1', candidateName: 'Bo' }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(as(interviewer('other-org')).create({ templateId: 'tpl-1', candidateName: 'Bo' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
     const tpl = (await stores.templates.get('default', 'tpl-1')) as TemplateRecord;
     await stores.templates.update({ ...tpl, archived: true });
     await expect(as(interviewer()).create({ templateId: 'tpl-1', candidateName: 'Bo' })).rejects.toMatchObject({

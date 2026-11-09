@@ -1,14 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { AuthSessionsRepo, UsersRepo } from '@swint/api-data-access-persistence';
 import { INTERVIEWER_ROLE, randomToken, sha256Hex, type Clock } from '@swint/api-util-rpc';
-import {
-  COOKIE,
-  cookieOptions,
-  OIDC_STATE_TTL_MS,
-  readSignedJson,
-  readSignedValue,
-  SESSION_TTL_MS,
-} from './cookies.js';
+import { COOKIE, cookieOptions, OIDC_STATE_TTL_MS, readSignedJson, readSignedValue, SESSION_TTL_MS } from './cookies.js';
 import type { OidcClient } from './oidc.js';
 
 export interface AuthRoutesDeps {
@@ -39,12 +32,7 @@ const hasUnsafeChar = (value: string): boolean =>
   });
 
 const safeReturnTo = (value: unknown): string =>
-  typeof value === 'string' &&
-  SAFE_RETURN_TO_PREFIX.test(value) &&
-  !hasUnsafeChar(value) &&
-  !ENCODED_UNSAFE.test(value)
-    ? value
-    : '/';
+  typeof value === 'string' && SAFE_RETURN_TO_PREFIX.test(value) && !hasUnsafeChar(value) && !ENCODED_UNSAFE.test(value) ? value : '/';
 
 export function registerAuthRoutes(app: FastifyInstance, deps: AuthRoutesDeps): void {
   const clearOpts = { path: '/' };

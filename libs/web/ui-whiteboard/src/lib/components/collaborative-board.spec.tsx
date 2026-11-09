@@ -58,7 +58,9 @@ describe('CollaborativeBoard', () => {
     api.updateScene.mockClear();
     render(<CollaborativeBoard doc={doc} awareness={null} readOnly={false} />);
     await act(async () => undefined);
-    expect(api.updateScene).toHaveBeenCalledWith(expect.objectContaining({ captureUpdate: 'NEVER', elements: [expect.objectContaining({ id: 'r1' })] }));
+    expect(api.updateScene).toHaveBeenCalledWith(
+      expect.objectContaining({ captureUpdate: 'NEVER', elements: [expect.objectContaining({ id: 'r1' })] }),
+    );
   });
 
   it('refuses pasted image files but allows other pastes', () => {

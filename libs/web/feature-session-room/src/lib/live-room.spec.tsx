@@ -11,14 +11,14 @@ const downloadBlob = vi.fn();
 vi.mock('@swint/web-ui-whiteboard', async () => {
   const { useEffect } = await import('react');
   return {
-  CollaborativeBoard: ({ readOnly, onReady }: { readOnly: boolean; onReady?: (h: unknown) => void }) => {
-    // Like the real board: the handle is handed out after mount, never during render.
-    useEffect(() => onReady?.({ exportAs }), [onReady]);
-    return <div data-testid="board" data-readonly={String(readOnly)} />;
-  },
-  EXPORT_FORMATS: ['png', 'svg', 'excalidraw'],
-  exportFileName: (t: string, f: string) => `${t}.${f}`,
-  downloadBlob: (...a: unknown[]) => downloadBlob(...a),
+    CollaborativeBoard: ({ readOnly, onReady }: { readOnly: boolean; onReady?: (h: unknown) => void }) => {
+      // Like the real board: the handle is handed out after mount, never during render.
+      useEffect(() => onReady?.({ exportAs }), [onReady]);
+      return <div data-testid="board" data-readonly={String(readOnly)} />;
+    },
+    EXPORT_FORMATS: ['png', 'svg', 'excalidraw'],
+    exportFileName: (t: string, f: string) => `${t}.${f}`,
+    downloadBlob: (...a: unknown[]) => downloadBlob(...a),
   };
 });
 vi.mock('@swint/web-ui-session-panels', async (importOriginal) => ({
@@ -29,10 +29,25 @@ vi.mock('@swint/web-ui-session-panels', async (importOriginal) => ({
 const { SessionRoomPage } = await import('./session-room-page.js');
 
 const timer = { startedAt: Date.now(), durationSec: 2700, extensionSec: 0 };
-const candidateView = { sessionId: 's1', title: 'URL shortener', status: 'live', timer, role: 'candidate', instructionsMd: '# Task', me: { name: 'Bo' } };
+const candidateView = {
+  sessionId: 's1',
+  title: 'URL shortener',
+  status: 'live',
+  timer,
+  role: 'candidate',
+  instructionsMd: '# Task',
+  me: { name: 'Bo' },
+};
 const interviewerView = { ...candidateView, role: 'interviewer', rubricMd: '- r', candidateName: 'Bo', me: { name: 'Ada', sub: 'sub-1' } };
 const stateMsg = (status: 'live' | 'ended' | 'cancelled') => ({
-  message: { type: 'session.state' as const, status, startedAt: timer.startedAt, durationSec: 2700, extensionSec: 0, serverNow: Date.now() },
+  message: {
+    type: 'session.state' as const,
+    status,
+    startedAt: timer.startedAt,
+    durationSec: 2700,
+    extensionSec: 0,
+    serverNow: Date.now(),
+  },
   offsetMs: 0,
 });
 const phase = (p: CollabPhase, everConnected = true) => ({ conn: { ...initialConnState, phase: p, everConnected } });
@@ -40,7 +55,9 @@ const phase = (p: CollabPhase, everConnected = true) => ({ conn: { ...initialCon
 function renderLive(view: object, get = vi.fn(async () => view), pollMs?: number) {
   const fake = createFakeCollabSession({ role: (view as { role: 'candidate' | 'interviewer' }).role });
   const utils = renderWithApi(
-    <CollabFactoryProvider factory={fake.factory}><SessionRoomPage pollMs={pollMs} /></CollabFactoryProvider>,
+    <CollabFactoryProvider factory={fake.factory}>
+      <SessionRoomPage pollMs={pollMs} />
+    </CollabFactoryProvider>,
     { api: fakeApi({ room: { get } }), path: '/s/s1', routePath: '/s/:sessionId' },
   );
   return { ...utils, fake, get };
@@ -52,9 +69,15 @@ describe('LiveRoom (candidate)', () => {
   it('edits the board and announces itself with the server-consistent identity', async () => {
     const { fake } = renderLive(candidateView);
     expect(await screen.findByTestId('board')).toHaveAttribute('data-readonly', 'false');
-    await waitFor(() => expect(fake.session.board.awareness.getLocalState()?.[AWARENESS_USER_FIELD]).toEqual({
-      userId: candidateUserId('s1'), name: 'Bo', role: 'candidate', color: colorForUser(candidateUserId('s1')), selectedElementIds: {},
-    }));
+    await waitFor(() =>
+      expect(fake.session.board.awareness.getLocalState()?.[AWARENESS_USER_FIELD]).toEqual({
+        userId: candidateUserId('s1'),
+        name: 'Bo',
+        role: 'candidate',
+        color: colorForUser(candidateUserId('s1')),
+        selectedElementIds: {},
+      }),
+    );
     expect(screen.queryByRole('tab', { name: 'Notes' })).not.toBeInTheDocument();
   });
 
@@ -87,7 +110,10 @@ describe('LiveRoom (candidate)', () => {
   });
 
   it('not_started → back to the waiting room via REST', async () => {
-    const get = vi.fn().mockResolvedValueOnce(candidateView).mockResolvedValue({ ...candidateView, status: 'created', instructionsMd: null });
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce(candidateView)
+      .mockResolvedValue({ ...candidateView, status: 'created', instructionsMd: null });
     const { fake } = renderLive(candidateView, get);
     await screen.findByTestId('board');
     act(() => fake.update(phase({ kind: 'rejected', reason: 'not_started' })));
@@ -103,7 +129,9 @@ describe('LiveRoom (candidate)', () => {
     });
     const get = vi.fn(async () => candidateView);
     renderWithApi(
-      <CollabFactoryProvider factory={factory}><SessionRoomPage pollMs={30} /></CollabFactoryProvider>,
+      <CollabFactoryProvider factory={factory}>
+        <SessionRoomPage pollMs={30} />
+      </CollabFactoryProvider>,
       { api: fakeApi({ room: { get } }), path: '/s/s1', routePath: '/s/:sessionId' },
     );
     await screen.findByTestId('board');
@@ -158,7 +186,14 @@ describe('LiveRoom (interviewer)', () => {
 
   it('4403 session_ended: read-only at once, then REST confirms ended and export appears', async () => {
     let resolveSecond: (v: unknown) => void = () => undefined;
-    const get = vi.fn().mockResolvedValueOnce(interviewerView).mockReturnValueOnce(new Promise((r) => { resolveSecond = r; }));
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce(interviewerView)
+      .mockReturnValueOnce(
+        new Promise((r) => {
+          resolveSecond = r;
+        }),
+      );
     const { fake } = renderLive(interviewerView, get);
     await screen.findByTestId('board');
     act(() => fake.update(phase({ kind: 'closed', reason: 'session_ended' })));

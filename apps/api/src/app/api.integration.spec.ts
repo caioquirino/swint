@@ -86,9 +86,7 @@ describe('API over HTTP', () => {
     const after = await server.inject({ method: 'GET', url: `/api/room/${session.id}`, cookies: cc });
     expect(after.statusCode).toBe(403);
     expect(after.json()).toMatchObject({ data: { reason: 'session_ended' } });
-    expect((await server.inject({ method: 'GET', url: `/join/${token}` })).headers.location).toBe(
-      '/link-invalid?reason=session_ended',
-    );
+    expect((await server.inject({ method: 'GET', url: `/join/${token}` })).headers.location).toBe('/link-invalid?reason=session_ended');
     await close();
   });
 
@@ -124,9 +122,7 @@ describe('API over HTTP', () => {
     expect(regen.statusCode).toBe(200);
     expect(regen.json().candidateUrl).not.toBe(candidateUrl);
 
-    expect((await server.inject({ method: 'GET', url: `/join/${oldToken}` })).headers.location).toBe(
-      '/link-invalid?reason=invite_revoked',
-    );
+    expect((await server.inject({ method: 'GET', url: `/join/${oldToken}` })).headers.location).toBe('/link-invalid?reason=invite_revoked');
     expect((await server.inject({ method: 'GET', url: `/api/room/${session.id}`, cookies: oldCc })).statusCode).toBe(401);
     await close();
   });

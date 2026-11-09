@@ -11,10 +11,7 @@ export interface SessionLifecycleState {
 }
 
 export type SessionCommand =
-  | { type: 'start' }
-  | { type: 'extend'; minutes: ExtensionMinutes }
-  | { type: 'end' }
-  | { type: 'cancel'; reason?: string };
+  { type: 'start' } | { type: 'extend'; minutes: ExtensionMinutes } | { type: 'end' } | { type: 'cancel'; reason?: string };
 
 export interface CommandContext {
   now: number;
@@ -47,11 +44,7 @@ export function initialLifecycle(durationSec: number): SessionLifecycleState {
   };
 }
 
-export function applyCommand(
-  state: SessionLifecycleState,
-  command: SessionCommand,
-  ctx: CommandContext,
-): SessionLifecycleState {
+export function applyCommand(state: SessionLifecycleState, command: SessionCommand, ctx: CommandContext): SessionLifecycleState {
   const reject = (): never => {
     throw new InvalidTransitionError(state.status, command.type);
   };

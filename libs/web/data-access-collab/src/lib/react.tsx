@@ -1,7 +1,13 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Awareness } from 'y-protocols/awareness';
 import type { AwarenessUser } from '@swint/shared-collab-protocol';
-import { createCollabSession, type CollabSession, type CollabSessionFactory, type CollabSessionOptions, type CollabSnapshot } from './collab-session.js';
+import {
+  createCollabSession,
+  type CollabSession,
+  type CollabSessionFactory,
+  type CollabSessionOptions,
+  type CollabSnapshot,
+} from './collab-session.js';
 import { readParticipants } from './presence.js';
 
 const FactoryContext = createContext<CollabSessionFactory>(createCollabSession);

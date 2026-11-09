@@ -64,10 +64,10 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   app.get('/healthz', async () => ({ ok: true }));
   deps.registerRoutes(app);
 
-  const openApiDoc = await new OpenAPIGenerator({ schemaConverters: [new ZodToJsonSchemaConverter()] }).generate(
-    contract,
-    { info: { title: 'Swint API', version: '0.1.0' }, servers: [{ url: '/api' }] },
-  );
+  const openApiDoc = await new OpenAPIGenerator({ schemaConverters: [new ZodToJsonSchemaConverter()] }).generate(contract, {
+    info: { title: 'Swint API', version: '0.1.0' },
+    servers: [{ url: '/api' }],
+  });
 
   const handler = new OpenAPIHandler(deps.router, {
     interceptors: [

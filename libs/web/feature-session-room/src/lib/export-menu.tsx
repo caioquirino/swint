@@ -27,7 +27,11 @@ export function ExportMenu({ board, title }: { board: BoardHandle | null; title:
           {LABEL[format]}
         </Button>
       ))}
-      {error ? <span role="alert" className="text-sm text-red-700">Export failed.</span> : null}
+      {error ? (
+        <span role="alert" className="text-sm text-red-700">
+          Export failed.
+        </span>
+      ) : null}
     </div>
   );
 }

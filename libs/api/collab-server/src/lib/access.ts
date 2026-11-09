@@ -21,11 +21,7 @@ export function targetOf(documentName: string): DocTarget {
   return parsed;
 }
 
-export function authorizeDocument(
-  identity: Identity,
-  target: DocTarget,
-  session: SessionRecord | null,
-): { readOnly: boolean } {
+export function authorizeDocument(identity: Identity, target: DocTarget, session: SessionRecord | null): { readOnly: boolean } {
   if (!session || session.orgId !== identity.orgId) throw new CollabAccessError('forbidden');
   if (identity.kind === 'candidate' && identity.sessionId !== target.sessionId) throw new CollabAccessError('forbidden');
   if (identity.kind === 'candidate' && identity.inviteHash !== session.activeInviteHash) {

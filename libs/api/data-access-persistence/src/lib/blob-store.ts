@@ -29,9 +29,7 @@ export function createBlobStore(s3: S3Client, bucket: string): BlobStore {
 
   return {
     async putJson(key, value) {
-      await s3.send(
-        new PutObjectCommand({ Bucket: bucket, Key: key, Body: JSON.stringify(value), ContentType: 'application/json' }),
-      );
+      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: JSON.stringify(value), ContentType: 'application/json' }));
     },
     async getJson<T>(key: string) {
       const bytes = await getRaw(key);

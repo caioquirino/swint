@@ -10,11 +10,7 @@ export interface OwnershipView {
   ownedByOther(clientId: number): boolean;
 }
 
-export function dropForeignClients(
-  view: OwnershipView,
-  states: Map<number, Record<string, unknown>>,
-  removedClients: Set<number>,
-): void {
+export function dropForeignClients(view: OwnershipView, states: Map<number, Record<string, unknown>>, removedClients: Set<number>): void {
   for (const clientId of [...states.keys()]) {
     if (!view.own.has(clientId) && view.ownedByOther(clientId)) states.delete(clientId);
   }

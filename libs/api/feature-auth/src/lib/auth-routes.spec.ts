@@ -71,11 +71,14 @@ describe('auth routes', () => {
     });
   });
 
-  it.each(['//evil.com', 'https://evil.com', 'nope', '/\\evil.com', '/\\/evil.com', '/%0d%0aSet-Cookie:x', '/ok\tpath'])('login sanitises returnTo %s to /', async (bad) => {
-    const { app } = await setup(okClaims);
-    const { oidcCookie } = await loginCookie(app, bad);
-    expect(JSON.parse(must(app.unsignCookie(oidcCookie.value).value)).returnTo).toBe('/');
-  });
+  it.each(['//evil.com', 'https://evil.com', 'nope', '/\\evil.com', '/\\/evil.com', '/%0d%0aSet-Cookie:x', '/ok\tpath'])(
+    'login sanitises returnTo %s to /',
+    async (bad) => {
+      const { app } = await setup(okClaims);
+      const { oidcCookie } = await loginCookie(app, bad);
+      expect(JSON.parse(must(app.unsignCookie(oidcCookie.value).value)).returnTo).toBe('/');
+    },
+  );
 
   it('login preserves a same-origin path with a query string', async () => {
     const { app } = await setup(okClaims);

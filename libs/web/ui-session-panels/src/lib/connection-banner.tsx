@@ -9,7 +9,10 @@ const text: Record<Exclude<BannerState, null>, string> = {
 export function ConnectionBanner({ state }: { state: BannerState }) {
   if (!state) return null;
   return (
-    <div role="status" className={state === 'unreachable' ? 'bg-red-50 px-4 py-2 text-sm text-red-800' : 'bg-amber-50 px-4 py-2 text-sm text-amber-900'}>
+    <div
+      role="status"
+      className={state === 'unreachable' ? 'bg-red-50 px-4 py-2 text-sm text-red-800' : 'bg-amber-50 px-4 py-2 text-sm text-amber-900'}
+    >
       {text[state]}
     </div>
   );

@@ -28,7 +28,11 @@ export const configSchema = raw.transform((env, ctx) => {
   const prod = env.NODE_ENV === 'production';
   const cookieSecret = env.COOKIE_SECRET ?? (prod ? undefined : DEV_COOKIE_SECRET);
   if (!cookieSecret || cookieSecret.length < 32 || (prod && cookieSecret === DEV_COOKIE_SECRET)) {
-    ctx.addIssue({ code: 'custom', path: ['COOKIE_SECRET'], message: 'COOKIE_SECRET must be at least 32 characters (and set explicitly in production)' });
+    ctx.addIssue({
+      code: 'custom',
+      path: ['COOKIE_SECRET'],
+      message: 'COOKIE_SECRET must be at least 32 characters (and set explicitly in production)',
+    });
     return z.NEVER;
   }
   const oidcClientSecret = env.OIDC_CLIENT_SECRET ?? (prod ? undefined : 'swint-dev-secret');

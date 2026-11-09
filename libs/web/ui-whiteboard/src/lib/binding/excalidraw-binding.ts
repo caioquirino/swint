@@ -141,7 +141,9 @@ export class ExcalidrawBinding {
   }
 
   private publishSelection(selected: Record<string, boolean>): void {
-    const ids = Object.keys(selected).filter((id) => selected[id]).sort();
+    const ids = Object.keys(selected)
+      .filter((id) => selected[id])
+      .sort();
     const key = ids.join('\u0000');
     if (key === this.lastSelectionKey) return;
     this.lastSelectionKey = key;

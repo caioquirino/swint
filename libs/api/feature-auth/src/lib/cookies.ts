@@ -39,10 +39,7 @@ export function fastifyCookieReader(request: FastifyRequest): SignedCookieReader
  * Reads signed cookies from a raw `Cookie` header (e.g. a WebSocket upgrade `IncomingMessage`),
  * verifying signatures exactly like @fastify/cookie does for the same secret.
  */
-export function headerCookieReader(
-  cookieHeader: string | undefined,
-  signer: Pick<Signer, 'unsign'>,
-): SignedCookieReader {
+export function headerCookieReader(cookieHeader: string | undefined, signer: Pick<Signer, 'unsign'>): SignedCookieReader {
   const cookies = cookieHeader ? fastifyCookie.parse(cookieHeader) : {};
   return (name) => {
     const raw = cookies[name];

@@ -9,8 +9,12 @@ vi.mock('@swint/web-ui-whiteboard', () => ({
   SeedBoardEditor: ({ initialElements, onChange }: { initialElements: unknown[]; onChange: (e: unknown[]) => void }) => (
     <div>
       <span data-testid="seed-count">{initialElements.length}</span>
-      <button type="button" onClick={() => onChange(initialElements)}>noop-change</button>
-      <button type="button" onClick={() => onChange([...initialElements, drawn])}>draw</button>
+      <button type="button" onClick={() => onChange(initialElements)}>
+        noop-change
+      </button>
+      <button type="button" onClick={() => onChange([...initialElements, drawn])}>
+        draw
+      </button>
     </div>
   ),
 }));
@@ -18,8 +22,16 @@ vi.mock('@swint/web-ui-whiteboard', () => ({
 const { TemplateEditorPage } = await import('./template-editor-page.js');
 
 const existing = {
-  id: 't1', title: 'URL shortener', instructionsMd: '# Go', rubricMd: '- x', durationMin: 45,
-  hasBoardSeed: true, archived: false, createdBy: 's', createdAt: 1, updatedAt: 100,
+  id: 't1',
+  title: 'URL shortener',
+  instructionsMd: '# Go',
+  rubricMd: '- x',
+  durationMin: 45,
+  hasBoardSeed: true,
+  archived: false,
+  createdBy: 's',
+  createdAt: 1,
+  updatedAt: 100,
 };
 const seed = { elements: [{ ...drawn, id: 'seed1', version: 1 }] };
 
@@ -125,7 +137,9 @@ describe('TemplateEditorPage (edit)', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     let calls = 0;
     const { queryClient } = renderWithApi(<TemplateEditorPage />, {
-      api: fakeApi({ templates: { get: async () => (calls++ === 0 ? existing : { ...existing, updatedAt: 200 }), getSeed: async () => seed, update } }),
+      api: fakeApi({
+        templates: { get: async () => (calls++ === 0 ? existing : { ...existing, updatedAt: 200 }), getSeed: async () => seed, update },
+      }),
       path: '/templates/t1',
       routePath: '/templates/:templateId',
     });

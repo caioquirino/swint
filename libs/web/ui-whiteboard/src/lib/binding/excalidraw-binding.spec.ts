@@ -6,7 +6,17 @@ import { ExcalidrawBinding, POINTER_INTERVAL_MS, type ExcalidrawFns, type SceneA
 import { createPeers } from '../../testing/test-peers.js';
 
 const el = (id: string, version: number, extra: Partial<SyncedElement> = {}): SyncedElement => ({
-  id, type: 'rectangle', version, versionNonce: version * 7, index: 'a0', isDeleted: false, x: 0, y: 0, width: 10, height: 10, ...extra,
+  id,
+  type: 'rectangle',
+  version,
+  versionNonce: version * 7,
+  index: 'a0',
+  isDeleted: false,
+  x: 0,
+  y: 0,
+  width: 10,
+  height: 10,
+  ...extra,
 });
 
 const fns: ExcalidrawFns = {
@@ -115,7 +125,9 @@ describe('ExcalidrawBinding', () => {
     getBoardElements(doc).set('r1', el('r1', 4));
     const api = fakeApi();
     new ExcalidrawBinding({ doc, api, fns, awareness: null, scheduler: fakeScheduler().s });
-    expect(api.updateScene).toHaveBeenCalledWith(expect.objectContaining({ captureUpdate: 'NEVER', elements: [expect.objectContaining({ id: 'r1', version: 4 })] }));
+    expect(api.updateScene).toHaveBeenCalledWith(
+      expect.objectContaining({ captureUpdate: 'NEVER', elements: [expect.objectContaining({ id: 'r1', version: 4 })] }),
+    );
   });
 
   it('read-only bindings never write', () => {
@@ -147,7 +159,13 @@ describe('ExcalidrawBinding', () => {
 
   it('publishes selection changes once per change, merged into the existing user field', () => {
     const { awA, bindA } = setup();
-    awA.setLocalStateField(AWARENESS_USER_FIELD, { userId: 'u', name: 'Ada', role: 'interviewer', color: '#1971c2', selectedElementIds: {} });
+    awA.setLocalStateField(AWARENESS_USER_FIELD, {
+      userId: 'u',
+      name: 'Ada',
+      role: 'interviewer',
+      color: '#1971c2',
+      selectedElementIds: {},
+    });
     const set = vi.spyOn(awA, 'setLocalStateField');
     bindA.handleChange([], { selectedElementIds: { r1: true, r2: false } });
     bindA.handleChange([], { selectedElementIds: { r1: true } });
@@ -159,17 +177,37 @@ describe('ExcalidrawBinding', () => {
     const { awA, apiA } = setup();
     const peer = new Awareness(new Y.Doc());
     peer.setLocalStateField(AWARENESS_USER_FIELD, {
-      userId: 'candidate:s1', name: 'Bo', role: 'candidate', color: '#2f9e44', selectedElementIds: { r1: true }, pointer: { x: 4, y: 5, tool: 'laser' },
+      userId: 'candidate:s1',
+      name: 'Bo',
+      role: 'candidate',
+      color: '#2f9e44',
+      selectedElementIds: { r1: true },
+      pointer: { x: 4, y: 5, tool: 'laser' },
     });
     const broken = new Awareness(new Y.Doc());
     broken.setLocalStateField(AWARENESS_USER_FIELD, { name: 'x' });
-    awA.setLocalStateField(AWARENESS_USER_FIELD, { userId: 'me', name: 'Me', role: 'interviewer', color: '#000000', selectedElementIds: {} });
+    awA.setLocalStateField(AWARENESS_USER_FIELD, {
+      userId: 'me',
+      name: 'Me',
+      role: 'interviewer',
+      color: '#000000',
+      selectedElementIds: {},
+    });
     applyAwarenessUpdate(awA, encodeAwarenessUpdate(peer, [peer.clientID]), 'remote');
     applyAwarenessUpdate(awA, encodeAwarenessUpdate(broken, [broken.clientID]), 'remote');
-    const last = apiA.updateScene.mock.calls.map((c) => c[0]).filter((s) => s.collaborators).at(-1);
+    const last = apiA.updateScene.mock.calls
+      .map((c) => c[0])
+      .filter((s) => s.collaborators)
+      .at(-1);
     const collaborators = [...(last.collaborators as Map<string, unknown>).values()];
     expect(collaborators).toEqual([
-      { id: 'candidate:s1', username: 'Bo', color: { background: '#2f9e44', stroke: '#2f9e44' }, pointer: { x: 4, y: 5, tool: 'laser' }, selectedElementIds: { r1: true } },
+      {
+        id: 'candidate:s1',
+        username: 'Bo',
+        color: { background: '#2f9e44', stroke: '#2f9e44' },
+        pointer: { x: 4, y: 5, tool: 'laser' },
+        selectedElementIds: { r1: true },
+      },
     ]);
   });
 

@@ -30,10 +30,7 @@ export const contract = {
     get: oc.route({ method: 'GET', path: '/templates/{id}' }).input(byId).output(templateSchema),
     getSeed: oc.route({ method: 'GET', path: '/templates/{id}/seed' }).input(byId).output(boardSeedSchema),
     create: oc.route({ method: 'POST', path: '/templates' }).input(templateInputSchema).output(templateSchema),
-    update: oc
-      .route({ method: 'PUT', path: '/templates/{id}' })
-      .input(byId.extend(templateInputSchema.shape))
-      .output(templateSchema),
+    update: oc.route({ method: 'PUT', path: '/templates/{id}' }).input(byId.extend(templateInputSchema.shape)).output(templateSchema),
     archive: oc.route({ method: 'POST', path: '/templates/{id}/archive' }).input(byId).output(templateSchema),
   },
   sessions: {
@@ -42,10 +39,7 @@ export const contract = {
       .input(z.object({ status: sessionStatusSchema.optional() }))
       .output(z.array(sessionSummarySchema)),
     get: oc.route({ method: 'GET', path: '/sessions/{id}' }).input(byId).output(sessionSchema),
-    create: oc
-      .route({ method: 'POST', path: '/sessions' })
-      .input(createSessionInputSchema)
-      .output(createSessionOutputSchema),
+    create: oc.route({ method: 'POST', path: '/sessions' }).input(createSessionInputSchema).output(createSessionOutputSchema),
     start: oc.route({ method: 'POST', path: '/sessions/{id}/start' }).input(byId).output(sessionSchema),
     extend: oc
       .route({ method: 'POST', path: '/sessions/{id}/extend' })
@@ -54,7 +48,16 @@ export const contract = {
     end: oc.route({ method: 'POST', path: '/sessions/{id}/end' }).input(byId).output(sessionSchema),
     cancel: oc
       .route({ method: 'POST', path: '/sessions/{id}/cancel' })
-      .input(byId.extend({ reason: z.string().trim().max(500).optional().transform((r) => r || undefined) }))
+      .input(
+        byId.extend({
+          reason: z
+            .string()
+            .trim()
+            .max(500)
+            .optional()
+            .transform((r) => r || undefined),
+        }),
+      )
       .output(sessionSchema),
     regenerateInvite: oc
       .route({ method: 'POST', path: '/sessions/{id}/invite' })

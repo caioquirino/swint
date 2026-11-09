@@ -22,7 +22,12 @@ export function SessionRoomPage({ pollMs }: { pollMs?: number }) {
     if (view.role === 'candidate' && view.status === 'created') return <WaitingRoom title={view.title} name={view.me.name} />;
     return <LiveRoom key={attempt} view={view} onRetry={retry} pollMs={pollMs} />;
   }
-  if (room.isPending) return <Screen title="Joining…"><Spinner /></Screen>;
+  if (room.isPending)
+    return (
+      <Screen title="Joining…">
+        <Spinner />
+      </Screen>
+    );
   return (
     <Screen title="Could not load the interview" actions={<Button onClick={() => void room.refetch()}>Retry</Button>}>
       Check your connection and try again.

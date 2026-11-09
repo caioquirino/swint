@@ -83,8 +83,15 @@ function box(id: string, x: number, label: string, index: number): Record<string
   return [
     element({ id: `${id}-box`, type: 'rectangle', x, y: 100, width: 160, height: 80, index: `a${index * 2}`, seed: 1000 + index * 10 }),
     element({
-      id: `${id}-label`, type: 'text', x: x + 20, y: 125, width: label.length * 11, height: 25,
-      index: `a${index * 2 + 1}`, seed: 2000 + index * 10, extra: text,
+      id: `${id}-label`,
+      type: 'text',
+      x: x + 20,
+      y: 125,
+      width: label.length * 11,
+      height: 25,
+      index: `a${index * 2 + 1}`,
+      seed: 2000 + index * 10,
+      extra: text,
     }),
   ];
 }

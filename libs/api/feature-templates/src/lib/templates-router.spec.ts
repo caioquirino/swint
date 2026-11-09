@@ -23,8 +23,7 @@ async function setup() {
     clock: { now: () => (t += 10) },
     newId: () => `id-${++n}`,
   });
-  const as = (identity: Identity | null) =>
-    createRouterClient({ templates: router }, { context: { identity, requestId: 't' } }).templates;
+  const as = (identity: Identity | null) => createRouterClient({ templates: router }, { context: { identity, requestId: 't' } }).templates;
   return { stores, as };
 }
 
@@ -40,9 +39,9 @@ describe('templates router', () => {
   it('rejects anonymous (UNAUTHORIZED) and candidates (FORBIDDEN)', async () => {
     const { as } = await setup();
     await expect(as(null).list({})).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-    await expect(
-      as({ kind: 'candidate', sessionId: 's', orgId: 'default', inviteHash: 'h', name: 'Bo' }).list({}),
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(as({ kind: 'candidate', sessionId: 's', orgId: 'default', inviteHash: 'h', name: 'Bo' }).list({})).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
   });
 
   it('creates, gets and returns the starting board', async () => {

@@ -16,7 +16,13 @@ describe('bannerState', () => {
 
 describe('myPresence', () => {
   it('matches what the server stamps', () => {
-    expect(myPresence({ role: 'interviewer', me: { name: 'Ada', sub: 'sub-1' } } as never)).toMatchObject({ userId: 'sub-1', role: 'interviewer' });
-    expect(myPresence({ role: 'candidate', sessionId: 's1', me: { name: 'Bo' } } as never)).toMatchObject({ userId: 'candidate:s1', role: 'candidate' });
+    expect(myPresence({ role: 'interviewer', me: { name: 'Ada', sub: 'sub-1' } } as never)).toMatchObject({
+      userId: 'sub-1',
+      role: 'interviewer',
+    });
+    expect(myPresence({ role: 'candidate', sessionId: 's1', me: { name: 'Bo' } } as never)).toMatchObject({
+      userId: 'candidate:s1',
+      role: 'candidate',
+    });
   });
 });

@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as Y from 'yjs';
 import { blobKeys } from '@swint/api-data-access-persistence';
-import { AWARENESS_USER_FIELD, candidateUserId, colorForUser, getBoardElements, parseServerMessage, docName } from '@swint/shared-collab-protocol';
+import {
+  AWARENESS_USER_FIELD,
+  candidateUserId,
+  colorForUser,
+  getBoardElements,
+  parseServerMessage,
+  docName,
+} from '@swint/shared-collab-protocol';
 import type { Identity } from '@swint/api-util-rpc';
 import { connectClient, seedSession, startCollabTestKit, type CollabTestKit } from '../testing/collab-test-kit.js';
 
@@ -166,9 +173,7 @@ describe('collab server: persistence', () => {
     const n = connectClient(kit, docName.notes(s.id), 'ada');
     await n.synced;
     n.doc.getXmlFragment('content').insert(0, [new Y.XmlText('hello')]);
-    await expect
-      .poll(() => kit.stores.blobs.getBytes(blobKeys.sessionNotesLatest('default', s.id)), { timeout: 5000 })
-      .not.toBeNull();
+    await expect.poll(() => kit.stores.blobs.getBytes(blobKeys.sessionNotesLatest('default', s.id)), { timeout: 5000 }).not.toBeNull();
     n.destroy();
   });
 
@@ -268,7 +273,11 @@ describe('collab server: persistence', () => {
 
   async function threeDirtyDocs(mode: 'hang' | 'fail') {
     const first = await setup('live', { shutdownTimeoutMs: 1500, storeRetryMs: 60_000 });
-    const sessions = [first, await seedSession(kit, { id: 'extra-1', status: 'live' }), await seedSession(kit, { id: 'extra-2', status: 'live' })];
+    const sessions = [
+      first,
+      await seedSession(kit, { id: 'extra-1', status: 'live' }),
+      await seedSession(kit, { id: 'extra-2', status: 'live' }),
+    ];
     if (mode === 'hang') kit.hangPuts = true;
     else kit.failPuts = true;
     const clients = [];
@@ -336,8 +345,12 @@ describe('collab server: presence', () => {
     await Promise.all([interviewer.synced, candidate.synced]);
 
     candidate.provider.awareness?.setLocalStateField(AWARENESS_USER_FIELD, {
-      userId: 'sub-1', name: 'Mallory', role: 'interviewer', color: '#000000',
-      selectedElementIds: {}, pointer: { x: 3, y: 4, tool: 'pointer' },
+      userId: 'sub-1',
+      name: 'Mallory',
+      role: 'interviewer',
+      color: '#000000',
+      selectedElementIds: {},
+      pointer: { x: 3, y: 4, tool: 'pointer' },
     });
     const candidateClientId = candidate.provider.awareness?.clientID as number;
 
@@ -355,7 +368,8 @@ describe('collab server: presence', () => {
     interviewer.provider.awareness?.setLocalStateField(AWARENESS_USER_FIELD, { name: 'Someone else' });
     const interviewerClientId = interviewer.provider.awareness?.clientID as number;
     const seenByCandidate = () =>
-      candidate.provider.awareness?.getStates().get(interviewerClientId)?.[AWARENESS_USER_FIELD] as { name?: string; role?: string } | undefined;
+      candidate.provider.awareness?.getStates().get(interviewerClientId)?.[AWARENESS_USER_FIELD] as
+        { name?: string; role?: string } | undefined;
     await until(() => seenByCandidate()?.name === 'Ada');
     expect(seenByCandidate()).toMatchObject({ userId: 'sub-1', name: 'Ada', role: 'interviewer' });
 

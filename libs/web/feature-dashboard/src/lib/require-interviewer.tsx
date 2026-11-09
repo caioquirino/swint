@@ -25,7 +25,12 @@ export function RequireInterviewer({ children }: { children: ReactNode }) {
     if (code === 'UNAUTHORIZED') navigation.assign(loginUrl(returnTo));
   }, [code, returnTo]);
 
-  if (me.isPending) return <Screen title="Loading…"><Spinner /></Screen>;
+  if (me.isPending)
+    return (
+      <Screen title="Loading…">
+        <Spinner />
+      </Screen>
+    );
   if (code === 'UNAUTHORIZED') return <Screen title="Redirecting to sign-in…" />;
   if (code === 'FORBIDDEN') return <Screen title="No access">Your account is not allowed to use Swint.</Screen>;
   if (me.isError) {

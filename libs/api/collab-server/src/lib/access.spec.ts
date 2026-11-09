@@ -72,7 +72,7 @@ describe('authorizeDocument (spec §7.1)', () => {
     expect(reasonOf(() => authorizeDocument(candidate, { sessionId: 's1', kind }, session(status)))).toBe(reason);
   });
 
-  it('candidate whose invite is no longer the session\'s active invite → invite_revoked', () => {
+  it("candidate whose invite is no longer the session's active invite → invite_revoked", () => {
     const stale = { ...candidate, inviteHash: 'old' };
     expect(reasonOf(() => authorizeDocument(stale, { sessionId: 's1', kind: 'board' }, session('live')))).toBe('invite_revoked');
     expect(reasonOf(() => authorizeDocument(stale, { sessionId: 's1', kind: 'board' }, session('created')))).toBe('invite_revoked');
@@ -80,27 +80,27 @@ describe('authorizeDocument (spec §7.1)', () => {
       reasonOf(() => authorizeDocument(candidate, { sessionId: 's1', kind: 'board' }, session('live', { activeInviteHash: 'new' }))),
     ).toBe('invite_revoked');
     // Org/session checks come first.
-    expect(
-      reasonOf(() => authorizeDocument({ ...stale, sessionId: 's2' }, { sessionId: 's1', kind: 'board' }, session('live'))),
-    ).toBe('forbidden');
+    expect(reasonOf(() => authorizeDocument({ ...stale, sessionId: 's2' }, { sessionId: 's1', kind: 'board' }, session('live')))).toBe(
+      'forbidden',
+    );
   });
 
   it('interviewers are unaffected by the active invite', () => {
-    expect(
-      authorizeDocument(interviewer, { sessionId: 's1', kind: 'board' }, session('live', { activeInviteHash: 'new' })),
-    ).toEqual({ readOnly: false });
+    expect(authorizeDocument(interviewer, { sessionId: 's1', kind: 'board' }, session('live', { activeInviteHash: 'new' }))).toEqual({
+      readOnly: false,
+    });
   });
 
   it('missing session, other org, other session, missing role → forbidden', () => {
     expect(reasonOf(() => authorizeDocument(interviewer, { sessionId: 's1', kind: 'board' }, null))).toBe('forbidden');
-    expect(
-      reasonOf(() => authorizeDocument(interviewer, { sessionId: 's1', kind: 'board' }, session('live', { orgId: 'other' }))),
-    ).toBe('forbidden');
-    expect(
-      reasonOf(() => authorizeDocument({ ...candidate, sessionId: 's2' }, { sessionId: 's1', kind: 'board' }, session('live'))),
-    ).toBe('forbidden');
-    expect(
-      reasonOf(() => authorizeDocument({ ...interviewer, roles: [] }, { sessionId: 's1', kind: 'board' }, session('live'))),
-    ).toBe('forbidden');
+    expect(reasonOf(() => authorizeDocument(interviewer, { sessionId: 's1', kind: 'board' }, session('live', { orgId: 'other' })))).toBe(
+      'forbidden',
+    );
+    expect(reasonOf(() => authorizeDocument({ ...candidate, sessionId: 's2' }, { sessionId: 's1', kind: 'board' }, session('live')))).toBe(
+      'forbidden',
+    );
+    expect(reasonOf(() => authorizeDocument({ ...interviewer, roles: [] }, { sessionId: 's1', kind: 'board' }, session('live')))).toBe(
+      'forbidden',
+    );
   });
 });

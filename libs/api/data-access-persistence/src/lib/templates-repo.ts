@@ -22,14 +22,10 @@ const item = (rec: TemplateRecord) => ({
 export function createTemplatesRepo(table: Table): TemplatesRepo {
   return {
     async create(rec) {
-      await table.doc.send(
-        new PutCommand({ TableName: table.name, Item: item(rec), ConditionExpression: 'attribute_not_exists(PK)' }),
-      );
+      await table.doc.send(new PutCommand({ TableName: table.name, Item: item(rec), ConditionExpression: 'attribute_not_exists(PK)' }));
     },
     async get(orgId, id) {
-      const out = await table.doc.send(
-        new GetCommand({ TableName: table.name, Key: { PK: `TEMPLATE#${id}`, SK: 'META' } }),
-      );
+      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: { PK: `TEMPLATE#${id}`, SK: 'META' } }));
       if (!out.Item || out.Item['orgId'] !== orgId) return null;
       return stripKeys(out.Item) as TemplateRecord;
     },

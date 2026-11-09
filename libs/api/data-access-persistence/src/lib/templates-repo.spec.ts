@@ -34,11 +34,7 @@ describe('TemplatesRepo', () => {
     await templates.create(tpl({ id: 't3', title: 'c old', archived: true }));
     await templates.create(tpl({ id: 't4', title: 'other', orgId: 'other-org' }));
     expect((await templates.listByOrg('default', { includeArchived: false })).map((t) => t.id)).toEqual(['t2', 't1']);
-    expect((await templates.listByOrg('default', { includeArchived: true })).map((t) => t.id)).toEqual([
-      't2',
-      't1',
-      't3',
-    ]);
+    expect((await templates.listByOrg('default', { includeArchived: true })).map((t) => t.id)).toEqual(['t2', 't1', 't3']);
   });
 
   it('update replaces and keeps title ordering in sync', async () => {

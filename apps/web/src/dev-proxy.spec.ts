@@ -16,7 +16,10 @@ describe('devProxy', () => {
     expect(matches(proxy, path)).toHaveLength(1);
   });
 
-  it.each(['/link-invalid?reason=session_ended', '/s/abc', '/', '/templates/new', '/authors', '/joined'])('leaves %s to the SPA', (path) => {
-    expect(matches(proxy, path)).toHaveLength(0);
-  });
+  it.each(['/link-invalid?reason=session_ended', '/s/abc', '/', '/templates/new', '/authors', '/joined'])(
+    'leaves %s to the SPA',
+    (path) => {
+      expect(matches(proxy, path)).toHaveLength(0);
+    },
+  );
 });

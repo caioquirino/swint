@@ -23,8 +23,7 @@ async function live(opts: Parameters<typeof startCollabTestKit>[0] = {}, status:
 }
 
 /** Ends the session in the repo (as the sessions router would) and returns the stored record. */
-const endInRepo = (s: SessionRecord) =>
-  kit.stores.sessions.update({ ...s, status: 'ended', endedAt: 5000, endedBy: 'sub-1' }, s.version);
+const endInRepo = (s: SessionRecord) => kit.stores.sessions.update({ ...s, status: 'ended', endedAt: 5000, endedBy: 'sub-1' }, s.version);
 
 const statuses = (c: TestClient) => c.stateless.map((p) => parseServerMessage(p)?.status);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -81,9 +80,7 @@ describe('sessionChanged', () => {
     await expect(b.closed).resolves.toEqual({ code: 4403, reason: 'invite_revoked' });
     await expect.poll(() => a.stateless.length).toBe(n + 1);
     const board = kit.collab.hocuspocus.documents.get(docName.board(s.id));
-    await expect.poll(() => board?.getConnections().map((c) => [c.context.identity.kind, c.readOnly])).toEqual([
-      ['interviewer', false],
-    ]);
+    await expect.poll(() => board?.getConnections().map((c) => [c.context.identity.kind, c.readOnly])).toEqual([['interviewer', false]]);
     a.destroy();
     b.destroy();
   });
@@ -109,18 +106,14 @@ describe('sessionChanged', () => {
 
   it('never throws, even if broadcasting fails', async () => {
     const s = await live();
-    await expect(
-      kit.collab.events.sessionChanged({ ...s, status: 'live', startedAt: null as unknown as number }),
-    ).resolves.toBeUndefined();
+    await expect(kit.collab.events.sessionChanged({ ...s, status: 'live', startedAt: null as unknown as number })).resolves.toBeUndefined();
   });
 
   it('never throws when the board is loaded and the record is invalid; logs the error with sessionId', async () => {
     const s = await live();
     const a = connectClient(kit, docName.board(s.id), 'ada');
     await a.synced;
-    await expect(
-      kit.collab.events.sessionChanged({ ...s, status: 'live', startedAt: null as unknown as number }),
-    ).resolves.toBeUndefined();
+    await expect(kit.collab.events.sessionChanged({ ...s, status: 'live', startedAt: null as unknown as number })).resolves.toBeUndefined();
     expect(hasErrorFor(s.id)()).toBe(true);
     a.destroy();
   });

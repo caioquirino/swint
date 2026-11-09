@@ -9,10 +9,7 @@ describe('doc names', () => {
   it('round-trips', () => {
     expect(parseDocName(docName.notes('s1'))).toEqual({ sessionId: 's1', kind: 'notes' });
   });
-  it.each(['', 'session::board', 'session:s1:code', 'room:s1:board', 'session:s1:board:x', 'session:a:b:board'])(
-    'rejects %j',
-    (name) => {
-      expect(parseDocName(name)).toBeNull();
-    },
-  );
+  it.each(['', 'session::board', 'session:s1:code', 'room:s1:board', 'session:s1:board:x', 'session:a:b:board'])('rejects %j', (name) => {
+    expect(parseDocName(name)).toBeNull();
+  });
 });

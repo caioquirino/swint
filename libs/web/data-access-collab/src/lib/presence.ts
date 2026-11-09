@@ -8,7 +8,5 @@ export function readParticipants(awareness: Awareness): AwarenessUser[] {
     const user = readAwarenessUser(state);
     if (user && !byId.has(user.userId)) byId.set(user.userId, user);
   });
-  return [...byId.values()].sort((a, b) =>
-    a.role === b.role ? a.name.localeCompare(b.name) : a.role === 'interviewer' ? -1 : 1,
-  );
+  return [...byId.values()].sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === 'interviewer' ? -1 : 1));
 }

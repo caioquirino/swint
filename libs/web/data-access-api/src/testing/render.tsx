@@ -18,7 +18,10 @@ export interface RenderWithApiOptions {
   routePath?: string;
 }
 
-export function renderWithApi(ui: ReactElement, { api, path = '/', routePath = '*' }: RenderWithApiOptions): RenderResult & { queryClient: QueryClient } {
+export function renderWithApi(
+  ui: ReactElement,
+  { api, path = '/', routePath = '*' }: RenderWithApiOptions,
+): RenderResult & { queryClient: QueryClient } {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const result = render(
     <QueryClientProvider client={queryClient}>

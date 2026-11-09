@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  SESSION_STATUSES,
-  type ExtensionMinutes,
-  type SessionStatus,
-} from '@swint/shared-domain';
+import { SESSION_STATUSES, type ExtensionMinutes, type SessionStatus } from '@swint/shared-domain';
 
 const epochMs = z.number().int().nonnegative();
 export const sessionStatusSchema = z.enum(SESSION_STATUSES as [SessionStatus, ...SessionStatus[]]);

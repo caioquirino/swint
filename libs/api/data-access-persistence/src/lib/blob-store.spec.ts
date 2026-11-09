@@ -21,9 +21,7 @@ describe('BlobStore', () => {
   it('builds the spec §4.2 key layout', () => {
     expect(blobKeys.templateSeed('o1', 't1', 's1')).toBe('orgs/o1/templates/t1/seed-s1.excalidraw.json');
     expect(blobKeys.sessionBoardLatest('o1', 'x1')).toBe('orgs/o1/sessions/x1/board/latest.bin');
-    expect(blobKeys.sessionBoardCheckpoint('o1', 'x1', 1700000000000)).toBe(
-      'orgs/o1/sessions/x1/board/checkpoints/1700000000000.bin',
-    );
+    expect(blobKeys.sessionBoardCheckpoint('o1', 'x1', 1700000000000)).toBe('orgs/o1/sessions/x1/board/checkpoints/1700000000000.bin');
     expect(blobKeys.sessionNotesLatest('o1', 'x1')).toBe('orgs/o1/sessions/x1/notes/latest.bin');
   });
 });

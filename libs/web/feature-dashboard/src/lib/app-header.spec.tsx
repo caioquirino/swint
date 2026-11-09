@@ -8,7 +8,10 @@ import { InterviewerLayout } from './interviewer-layout.js';
 describe('InterviewerLayout / AppHeader', () => {
   it('shows the user and logs out through the API', async () => {
     const assign = vi.spyOn(navigation, 'assign').mockImplementation(() => undefined);
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ redirectUrl: 'http://kc/logout' }), { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ redirectUrl: 'http://kc/logout' }), { status: 200 })),
+    );
     renderWithApi(<InterviewerLayout />, {
       api: fakeApi({ me: { get: async () => ({ sub: 's', name: 'Ada', email: null, orgId: 'default', roles: ['interviewer'] }) } }),
     });

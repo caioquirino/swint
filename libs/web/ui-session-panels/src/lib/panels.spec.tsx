@@ -49,7 +49,9 @@ describe('panels', () => {
     };
     render(
       <div>
-        <PanelBoundary title="Notes"><Boom /></PanelBoundary>
+        <PanelBoundary title="Notes">
+          <Boom />
+        </PanelBoundary>
         <p>still here</p>
       </div>,
     );

@@ -16,11 +16,7 @@ export function SeedBoardEditor({ initialElements, onChange }: SeedBoardEditorPr
         initialData={{ elements: initialElements as never }}
         UIOptions={{ tools: { image: false } }}
         onChange={(elements) =>
-          onChange(
-            elements
-              .filter((e) => !e.isDeleted && e.type !== 'image')
-              .map((e) => structuredClone(e) as unknown as SyncedElement),
-          )
+          onChange(elements.filter((e) => !e.isDeleted && e.type !== 'image').map((e) => structuredClone(e) as unknown as SyncedElement))
         }
       />
     </div>

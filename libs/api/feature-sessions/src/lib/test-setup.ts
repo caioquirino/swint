@@ -22,8 +22,7 @@ export async function setupSessions() {
     publicBaseUrl: 'http://localhost:4200',
     events,
   });
-  const as = (identity: Identity | null) =>
-    createRouterClient({ sessions: router }, { context: { identity, requestId: 't' } }).sessions;
+  const as = (identity: Identity | null) => createRouterClient({ sessions: router }, { context: { identity, requestId: 't' } }).sessions;
   await stores.templates.create({
     id: 'tpl-1',
     orgId: 'default',

@@ -22,6 +22,7 @@ Test users (Keycloak realm `swint`, password `password`): `interviewer1`, `inter
 Keycloak admin console: http://localhost:8080 (admin / admin).
 
 Useful endpoints:
+
 - `GET http://localhost:3000/healthz`
 - `GET http://localhost:3000/api/openapi.json`
 - `ws://localhost:3000/collab` — real-time collaboration (Hocuspocus/Yjs). Requires the session cookie (interviewer) or candidate cookie; documents `session:<id>:board` and `session:<id>:notes`.

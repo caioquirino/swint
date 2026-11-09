@@ -46,7 +46,6 @@ export function createDocStore(deps: DocStoreDeps): DocStore {
   return {
     load: (orgId, target) => deps.blobs.getBytes(keyFor(orgId, target)),
     store: (orgId, target, state, opts) => putWithRetry(keyFor(orgId, target), state, target.sessionId, opts?.retries),
-    checkpoint: (orgId, sessionId, ts, state) =>
-      putWithRetry(blobKeys.sessionBoardCheckpoint(orgId, sessionId, ts), state, sessionId),
+    checkpoint: (orgId, sessionId, ts, state) => putWithRetry(blobKeys.sessionBoardCheckpoint(orgId, sessionId, ts), state, sessionId),
   };
 }

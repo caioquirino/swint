@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applyCommand,
-  initialLifecycle,
-  InvalidTransitionError,
-  isFinished,
-  type SessionLifecycleState,
-} from './lifecycle.js';
+import { applyCommand, initialLifecycle, InvalidTransitionError, isFinished, type SessionLifecycleState } from './lifecycle.js';
 
 const ctx = { now: 1_000_000, actorId: 'interviewer-1' };
 const created = (): SessionLifecycleState => initialLifecycle(45 * 60);
@@ -66,12 +60,7 @@ describe('applyCommand', () => {
 
   it.each(['ended', 'cancelled'] as const)('rejects every command once %s', (finalStatus) => {
     const final = applyCommand(live(), finalStatus === 'ended' ? { type: 'end' } : { type: 'cancel' }, ctx);
-    for (const command of [
-      { type: 'start' },
-      { type: 'extend', minutes: 5 },
-      { type: 'end' },
-      { type: 'cancel' },
-    ] as const) {
+    for (const command of [{ type: 'start' }, { type: 'extend', minutes: 5 }, { type: 'end' }, { type: 'cancel' }] as const) {
       expect(() => applyCommand(final, command, ctx)).toThrow(InvalidTransitionError);
     }
   });

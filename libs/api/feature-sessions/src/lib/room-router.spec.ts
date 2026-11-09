@@ -11,9 +11,12 @@ async function setup() {
   const out = await ctx.as(ada).create({ templateId: 'tpl-1', candidateName: 'Bo' });
   const id = out.session.id;
   const room = (identity: Identity | null) =>
-    createRouterClient({ room: createRoomRouter({ sessions: ctx.stores.sessions }) }, {
-      context: { identity, requestId: 't' },
-    }).room;
+    createRouterClient(
+      { room: createRoomRouter({ sessions: ctx.stores.sessions }) },
+      {
+        context: { identity, requestId: 't' },
+      },
+    ).room;
   const cand: Identity = { kind: 'candidate', sessionId: id, orgId: 'default', inviteHash: 'h', name: 'Bo' };
   return { ...ctx, id, room, cand };
 }

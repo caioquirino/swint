@@ -56,10 +56,7 @@ export interface App {
 }
 
 /** A `SessionEvents` that never rejects: calls each defined implementation in order, logging failures. */
-export function composeEvents(
-  logger: Pick<FastifyBaseLogger, 'error'>,
-  ...list: (SessionEvents | undefined)[]
-): SessionEvents {
+export function composeEvents(logger: Pick<FastifyBaseLogger, 'error'>, ...list: (SessionEvents | undefined)[]): SessionEvents {
   const impls = list.filter((e): e is SessionEvents => e !== undefined);
   return {
     async sessionChanged(rec) {
@@ -112,7 +109,13 @@ export async function createApp(
   const clock = systemClock;
   let devSeedResult: 'created' | 'exists' | undefined;
   if (config.seedDevData) {
-    devSeedResult = await seedDevData({ templates: repos.templates, blobs: repos.blobs, clock, newId: ulidIds, orgId: config.defaultOrgId });
+    devSeedResult = await seedDevData({
+      templates: repos.templates,
+      blobs: repos.blobs,
+      clock,
+      newId: ulidIds,
+      orgId: config.defaultOrgId,
+    });
   }
   const secureCookies = config.nodeEnv === 'production';
   const oidc =

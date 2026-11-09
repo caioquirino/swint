@@ -62,9 +62,7 @@ export function CollaborativeBoard({ doc, awareness, readOnly, onReady }: Collab
         isCollaborating
         viewModeEnabled={readOnly}
         UIOptions={{ tools: { image: false } }}
-        onChange={(elements, appState) =>
-          bindingRef.current?.handleChange(elements as unknown as readonly SyncedElement[], appState)
-        }
+        onChange={(elements, appState) => bindingRef.current?.handleChange(elements as unknown as readonly SyncedElement[], appState)}
         onPointerUpdate={({ pointer }) => bindingRef.current?.handlePointer(pointer)}
         onPaste={(_data, event) => !hasImageFile(event)}
       />

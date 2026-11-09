@@ -90,10 +90,7 @@ export function createCollabSession(opts: CollabSessionOptions): CollabSession {
     onClose: ({ event }) => dispatch({ type: 'close', code: event?.code ?? 1006, reason: event?.reason ?? '' }),
   });
 
-  const makeDoc = (
-    name: string,
-    extra: Partial<ConstructorParameters<typeof HocuspocusProvider>[0]>,
-  ): CollabDoc => {
+  const makeDoc = (name: string, extra: Partial<ConstructorParameters<typeof HocuspocusProvider>[0]>): CollabDoc => {
     const doc = new Y.Doc();
     const provider = new HocuspocusProvider({ websocketProvider: socket, name, document: doc, token: 'cookie', ...extra });
     // With an external websocketProvider the provider does not attach itself.

@@ -13,7 +13,11 @@ const templates = [{ id: 't1', title: 'URL shortener', durationMin: 45, archived
 function api(overrides: Record<string, Record<string, (...a: never[]) => unknown>> = {}) {
   return {
     sessions: { list: vi.fn(async () => sessions), create: vi.fn(), ...overrides['sessions'] },
-    templates: { list: vi.fn(async () => templates), archive: vi.fn(async () => ({ ...templates[0], archived: true })), ...overrides['templates'] },
+    templates: {
+      list: vi.fn(async () => templates),
+      archive: vi.fn(async () => ({ ...templates[0], archived: true })),
+      ...overrides['templates'],
+    },
   };
 }
 

@@ -68,9 +68,7 @@ export function createIdentityResolver(deps: IdentityResolverDeps): IdentityReso
 }
 
 /** Same semantics as {@link createIdentityResolver}, from a raw Cookie header signed with `cookieSecret`. */
-export function createCookieIdentityResolver(
-  deps: IdentityResolverDeps & { cookieSecret: string },
-): CookieHeaderIdentityResolver {
+export function createCookieIdentityResolver(deps: IdentityResolverDeps & { cookieSecret: string }): CookieHeaderIdentityResolver {
   const signer = signerFactory(deps.cookieSecret);
   return (cookieHeader) => resolveIdentity(deps, headerCookieReader(cookieHeader, signer));
 }

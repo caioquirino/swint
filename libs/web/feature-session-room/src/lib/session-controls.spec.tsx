@@ -23,7 +23,10 @@ describe('SessionControls', () => {
     renderWithApi(<SessionControls sessionId="s1" status="live" />, { api: fakeApi({ sessions: { extend } }) });
     await userEvent.click(screen.getByRole('button', { name: '+5 min' }));
     await userEvent.click(screen.getByRole('button', { name: '+10 min' }));
-    expect(extend.mock.calls.map((c) => (c as unknown[])[0])).toEqual([{ id: 's1', minutes: 5 }, { id: 's1', minutes: 10 }]);
+    expect(extend.mock.calls.map((c) => (c as unknown[])[0])).toEqual([
+      { id: 's1', minutes: 5 },
+      { id: 's1', minutes: 10 },
+    ]);
   });
 
   it('ends only after confirmation', async () => {

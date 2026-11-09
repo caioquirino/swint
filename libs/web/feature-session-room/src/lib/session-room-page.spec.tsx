@@ -13,33 +13,53 @@ vi.mock('@swint/web-ui-whiteboard', () => ({
 }));
 
 const base = { sessionId: 's1', title: 'URL shortener', timer: { startedAt: 1000, durationSec: 2700, extensionSec: 0 } };
-const candidate = (status: 'created' | 'live') => ({ ...base, role: 'candidate', status, instructionsMd: status === 'created' ? null : '# Task', me: { name: 'Bo' } });
+const candidate = (status: 'created' | 'live') => ({
+  ...base,
+  role: 'candidate',
+  status,
+  instructionsMd: status === 'created' ? null : '# Task',
+  me: { name: 'Bo' },
+});
 const interviewer = (status: 'created' | 'live' | 'ended') => ({
-  ...base, role: 'interviewer', status, instructionsMd: '# Task', rubricMd: '- secret rubric', candidateName: 'Bo', me: { name: 'Ada', sub: 'sub-1' },
+  ...base,
+  role: 'interviewer',
+  status,
+  instructionsMd: '# Task',
+  rubricMd: '- secret rubric',
+  candidateName: 'Bo',
+  me: { name: 'Ada', sub: 'sub-1' },
 });
 
 const renderRoom = (get: () => Promise<unknown>, pollMs?: number) => {
   const fake = createFakeCollabSession({ role: 'interviewer' });
   return renderWithApi(
-    <CollabFactoryProvider factory={fake.factory}><SessionRoomPage pollMs={pollMs} /></CollabFactoryProvider>,
+    <CollabFactoryProvider factory={fake.factory}>
+      <SessionRoomPage pollMs={pollMs} />
+    </CollabFactoryProvider>,
     { api: fakeApi({ room: { get } }), path: '/s/s1', routePath: '/s/:sessionId' },
   );
 };
 
 describe('SessionRoomPage gate', () => {
   it('asks anonymous visitors to sign in (or use their invitation link)', async () => {
-    renderRoom(async () => { throw orpcError('UNAUTHORIZED'); });
+    renderRoom(async () => {
+      throw orpcError('UNAUTHORIZED');
+    });
     expect(await screen.findByRole('link', { name: /sign in as interviewer/i })).toHaveAttribute('href', '/auth/login?returnTo=%2Fs%2Fs1');
     expect(screen.getByText(/invitation link/i)).toBeInTheDocument();
   });
 
   it('shows the ended screen when the candidate session is over', async () => {
-    renderRoom(async () => { throw orpcError('FORBIDDEN', { reason: 'session_ended' }); });
+    renderRoom(async () => {
+      throw orpcError('FORBIDDEN', { reason: 'session_ended' });
+    });
     expect(await screen.findByRole('heading', { name: 'The interview has ended' })).toBeInTheDocument();
   });
 
   it.each([['FORBIDDEN'], ['NOT_FOUND']])('%s → unavailable', async (code) => {
-    renderRoom(async () => { throw orpcError(code); });
+    renderRoom(async () => {
+      throw orpcError(code);
+    });
     expect(await screen.findByRole('heading', { name: 'This room is not available' })).toBeInTheDocument();
   });
 

@@ -54,7 +54,11 @@ export function TimerBar({ status, timer, offsetMs }: TimerBarProps) {
     label = remaining < 0 ? `+${formatClock(remaining)} overtime` : `${formatClock(remaining)} left`;
   }
   return (
-    <span role="timer" data-phase={phase} className={cn('rounded-md px-3 py-1 font-mono text-sm font-semibold tabular-nums', phaseClass[phase])}>
+    <span
+      role="timer"
+      data-phase={phase}
+      className={cn('rounded-md px-3 py-1 font-mono text-sm font-semibold tabular-nums', phaseClass[phase])}
+    >
       {label}
     </span>
   );

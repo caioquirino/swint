@@ -48,8 +48,7 @@ export function reduceConn(state: CollabConnState, event: CollabEvent, failedOpe
     case 'authenticated':
       return { ...state, phase: { kind: 'connected' }, everConnected: true, readOnly: event.readOnly };
     case 'authFailed': {
-      const reason: RejectReason =
-        isCloseReason(event.reason) && event.reason !== 'unauthenticated' ? event.reason : 'forbidden';
+      const reason: RejectReason = isCloseReason(event.reason) && event.reason !== 'unauthenticated' ? event.reason : 'forbidden';
       return { ...state, phase: { kind: 'rejected', reason } };
     }
     case 'close': {

@@ -24,7 +24,9 @@ describe('candidateUserId', () => {
 
 describe('stampAwarenessState', () => {
   it('overwrites identity fields claimed by the client', () => {
-    const state = { [AWARENESS_USER_FIELD]: { userId: 'evil', name: 'Mallory', role: 'interviewer', color: '#000000', selectedElementIds: {} } };
+    const state = {
+      [AWARENESS_USER_FIELD]: { userId: 'evil', name: 'Mallory', role: 'interviewer', color: '#000000', selectedElementIds: {} },
+    };
     const out = stampAwarenessState(state, { userId: 'candidate:s1', name: 'Bo', role: 'candidate' });
     expect(out[AWARENESS_USER_FIELD]).toEqual({
       userId: 'candidate:s1',

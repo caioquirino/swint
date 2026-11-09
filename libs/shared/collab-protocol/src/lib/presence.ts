@@ -2,9 +2,7 @@ import type { ParticipantRole } from '@swint/shared-domain';
 import { AWARENESS_USER_FIELD, awarenessUserSchema, type AwarenessUser } from './awareness.js';
 
 /** Cursor colours that read well on a white canvas. */
-export const PRESENCE_COLORS: readonly string[] = [
-  '#e03131', '#2f9e44', '#1971c2', '#f08c00', '#9c36b5', '#0c8599', '#e8590c', '#5c940d',
-];
+export const PRESENCE_COLORS: readonly string[] = ['#e03131', '#2f9e44', '#1971c2', '#f08c00', '#9c36b5', '#0c8599', '#e8590c', '#5c940d'];
 
 const MAX_SELECTED = 1000;
 
@@ -41,8 +39,7 @@ export function stampAwarenessState(state: Record<string, unknown>, who: Presenc
   const claimed = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
   const pointer = pointerSchema.safeParse(claimed['pointer']);
   const selection = selectionSchema.safeParse(claimed['selectedElementIds']);
-  const selectedElementIds =
-    selection.success && Object.keys(selection.data).length <= MAX_SELECTED ? selection.data : {};
+  const selectedElementIds = selection.success && Object.keys(selection.data).length <= MAX_SELECTED ? selection.data : {};
   const user: AwarenessUser = {
     userId: who.userId,
     name: who.name.slice(0, 100) || 'Unknown',

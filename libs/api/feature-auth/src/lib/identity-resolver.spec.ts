@@ -42,8 +42,7 @@ async function setup() {
   };
   await stores.sessions.create(session);
   await stores.invites.create({ hash: 'inv-hash', orgId: 'default', sessionId: 's1', createdAt: 1, revokedAt: null });
-  const whoami = async (cookies: Record<string, string>) =>
-    (await app.inject({ method: 'GET', url: '/whoami', cookies })).json().identity;
+  const whoami = async (cookies: Record<string, string>) => (await app.inject({ method: 'GET', url: '/whoami', cookies })).json().identity;
   return { stores, app, whoami };
 }
 
@@ -108,13 +107,9 @@ describe('identity resolver', () => {
     const { stores, app, whoami } = await setup();
     const sign = (o: object) => app.signCookie(JSON.stringify(o));
     expect(await whoami({ [COOKIE.candidate]: sign({ sessionId: 's1', inviteHash: 'inv-hash', exp: NOW - 1 }) })).toBeNull();
-    expect(
-      await whoami({ [COOKIE.candidate]: sign({ sessionId: 'other', inviteHash: 'inv-hash', exp: NOW + 1 }) }),
-    ).toBeNull();
+    expect(await whoami({ [COOKIE.candidate]: sign({ sessionId: 'other', inviteHash: 'inv-hash', exp: NOW + 1 }) })).toBeNull();
     await stores.invites.revoke('inv-hash', NOW);
-    expect(
-      await whoami({ [COOKIE.candidate]: sign({ sessionId: 's1', inviteHash: 'inv-hash', exp: NOW + 1 }) }),
-    ).toBeNull();
+    expect(await whoami({ [COOKIE.candidate]: sign({ sessionId: 's1', inviteHash: 'inv-hash', exp: NOW + 1 }) })).toBeNull();
   });
 
   it('candidate cookie for a non-revoked invite that is no longer the session active invite → null', async () => {
@@ -161,9 +156,7 @@ describe('cookie-header identity resolver (raw upgrade requests)', () => {
       expiresAt: NOW / 1000 + 3600,
     });
     const cand = app.signCookie(JSON.stringify({ sessionId: 's1', inviteHash: 'inv-hash', exp: NOW + 1000 }));
-    expect(
-      await resolveHeader(header({ other: 'x', [COOKIE.candidate]: cand, [COOKIE.session]: app.signCookie('sid-1') })),
-    ).toEqual({
+    expect(await resolveHeader(header({ other: 'x', [COOKIE.candidate]: cand, [COOKIE.session]: app.signCookie('sid-1') }))).toEqual({
       kind: 'interviewer',
       sub: 'sub-1',
       name: 'Ada',

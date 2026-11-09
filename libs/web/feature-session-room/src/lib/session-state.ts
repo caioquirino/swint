@@ -25,10 +25,7 @@ export function mergeSessionState(
   return newer ? { status: incoming.status, timer: incoming.timer, offsetMs } : { ...current, offsetMs };
 }
 
-export function useMergedSessionState(
-  view: RoomView,
-  live: { message: SessionStateMessage; offsetMs: number } | null,
-): RoomSessionState {
+export function useMergedSessionState(view: RoomView, live: { message: SessionStateMessage; offsetMs: number } | null): RoomSessionState {
   const last = useRef<RoomSessionState | null>(null);
   return useMemo(() => {
     let next = mergeSessionState(last.current, { status: view.status, timer: view.timer });

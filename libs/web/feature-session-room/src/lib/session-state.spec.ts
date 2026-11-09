@@ -5,7 +5,11 @@ const timer = (extensionSec = 0, startedAt: number | null = 1000) => ({ startedA
 
 describe('mergeSessionState', () => {
   it('starts from the first value, offset defaulting to 0', () => {
-    expect(mergeSessionState(null, { status: 'created', timer: timer(0, null) })).toEqual({ status: 'created', timer: timer(0, null), offsetMs: 0 });
+    expect(mergeSessionState(null, { status: 'created', timer: timer(0, null) })).toEqual({
+      status: 'created',
+      timer: timer(0, null),
+      offsetMs: 0,
+    });
   });
 
   it('never regresses status (a stale REST view after a live end message)', () => {

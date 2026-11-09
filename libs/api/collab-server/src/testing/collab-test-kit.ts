@@ -35,7 +35,9 @@ export interface CollabTestKit {
 const silentLogger: CollabLogger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined };
 
 export async function startCollabTestKit(
-  opts: Partial<Pick<CollabServerDeps, 'debounceMs' | 'maxDebounceMs' | 'checkpointIntervalMs' | 'sleep' | 'storeRetryMs' | 'shutdownTimeoutMs'>> & {
+  opts: Partial<
+    Pick<CollabServerDeps, 'debounceMs' | 'maxDebounceMs' | 'checkpointIntervalMs' | 'sleep' | 'storeRetryMs' | 'shutdownTimeoutMs'>
+  > & {
     now?: () => number;
     /** Reuse existing stores (simulates a server restart over the same table and bucket). */
     stores?: TestStores;

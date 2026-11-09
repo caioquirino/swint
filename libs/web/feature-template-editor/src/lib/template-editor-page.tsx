@@ -10,7 +10,10 @@ import { SeedBoardEditor } from '@swint/web-ui-whiteboard';
 import { MarkdownField } from './markdown-field.js';
 
 const signature = (elements: readonly SyncedElement[]) =>
-  elements.map((e) => `${e.id}:${e.version}`).sort().join('|');
+  elements
+    .map((e) => `${e.id}:${e.version}`)
+    .sort()
+    .join('|');
 
 type FieldErrors = Partial<Record<'title' | 'durationMin' | 'instructionsMd' | 'rubricMd' | 'boardSeed', string>>;
 
@@ -30,7 +33,12 @@ export function TemplateEditorPage() {
   const seed = useQuery({ ...orpc.templates.getSeed.queryOptions({ input: { id: templateId ?? '' } }), enabled: !!templateId });
 
   if (!templateId) return <TemplateForm loaded={null} initialElements={[]} />;
-  if (template.isPending || seed.isPending) return <Screen title="Loading template…"><Spinner /></Screen>;
+  if (template.isPending || seed.isPending)
+    return (
+      <Screen title="Loading template…">
+        <Spinner />
+      </Screen>
+    );
   if (template.isError || seed.isError) {
     const code = apiError(template.error ?? seed.error)?.code;
     return <Screen title={code === 'NOT_FOUND' ? 'Template not found' : 'Could not load the template'} />;
@@ -114,26 +122,65 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
         <div className="grid grid-cols-[1fr_12rem] gap-4">
           <label className="text-sm font-medium">
             Title
-            <input aria-label="Title" value={form.title} onChange={(e) => set('title')(e.target.value)} className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5" />
-            {errors.title ? <span role="alert" className="text-xs text-red-700">{errors.title}</span> : null}
+            <input
+              aria-label="Title"
+              value={form.title}
+              onChange={(e) => set('title')(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5"
+            />
+            {errors.title ? (
+              <span role="alert" className="text-xs text-red-700">
+                {errors.title}
+              </span>
+            ) : null}
           </label>
           <label className="text-sm font-medium">
             Duration (minutes)
-            <input aria-label="Duration (minutes)" type="number" min={5} max={240} value={form.durationMin} onChange={(e) => set('durationMin')(e.target.value)} className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5" />
-            {errors.durationMin ? <span role="alert" className="text-xs text-red-700">{errors.durationMin}</span> : null}
+            <input
+              aria-label="Duration (minutes)"
+              type="number"
+              min={5}
+              max={240}
+              value={form.durationMin}
+              onChange={(e) => set('durationMin')(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5"
+            />
+            {errors.durationMin ? (
+              <span role="alert" className="text-xs text-red-700">
+                {errors.durationMin}
+              </span>
+            ) : null}
           </label>
         </div>
         <MarkdownField label="Instructions" value={form.instructionsMd} onChange={set('instructionsMd')} error={errors.instructionsMd} />
-        <MarkdownField label="Rubric (interviewers only)" value={form.rubricMd} onChange={set('rubricMd')} rows={6} error={errors.rubricMd} />
+        <MarkdownField
+          label="Rubric (interviewers only)"
+          value={form.rubricMd}
+          onChange={set('rubricMd')}
+          rows={6}
+          error={errors.rubricMd}
+        />
         <div>
           <p className="mb-1 text-sm font-medium">Starting board</p>
           <SeedBoardEditor initialElements={initialElements} onChange={onBoardChange} />
-          {errors.boardSeed ? <p role="alert" className="text-xs text-red-700">{errors.boardSeed}</p> : null}
+          {errors.boardSeed ? (
+            <p role="alert" className="text-xs text-red-700">
+              {errors.boardSeed}
+            </p>
+          ) : null}
         </div>
-        {saveError ? <p role="alert" className="text-sm text-red-700">{saveError}</p> : null}
+        {saveError ? (
+          <p role="alert" className="text-sm text-red-700">
+            {saveError}
+          </p>
+        ) : null}
         <div className="flex gap-3">
-          <Button type="submit" disabled={saving}>Save template</Button>
-          <Button variant="secondary" onClick={() => navigate('/')}>Cancel</Button>
+          <Button type="submit" disabled={saving}>
+            Save template
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/')}>
+            Cancel
+          </Button>
         </div>
       </form>
     </main>

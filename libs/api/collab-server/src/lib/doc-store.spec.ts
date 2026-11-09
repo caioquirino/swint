@@ -19,9 +19,7 @@ describe('DocStore', () => {
   it('checkpoint writes under the checkpoint key', async () => {
     const { blobs } = await createTestStores();
     await createDocStore({ blobs, logger }).checkpoint('o1', 's1', 1700000000000, new Uint8Array([9]));
-    await expect(blobs.getBytes(blobKeys.sessionBoardCheckpoint('o1', 's1', 1700000000000))).resolves.toEqual(
-      new Uint8Array([9]),
-    );
+    await expect(blobs.getBytes(blobKeys.sessionBoardCheckpoint('o1', 's1', 1700000000000))).resolves.toEqual(new Uint8Array([9]));
   });
 
   it('retries failed writes with 100/400/1600 ms backoff, then throws', async () => {

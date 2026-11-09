@@ -29,10 +29,12 @@ afterEach(async () => {
   http401 = null;
 });
 
-async function startServer(hooks: {
-  onAuthenticate?: (p: onAuthenticatePayload) => Promise<unknown>;
-  connected?: (p: { connection: { sendStateless(s: string): void } }) => Promise<void>;
-} = {}) {
+async function startServer(
+  hooks: {
+    onAuthenticate?: (p: onAuthenticatePayload) => Promise<unknown>;
+    connected?: (p: { connection: { sendStateless(s: string): void } }) => Promise<void>;
+  } = {},
+) {
   server = new Server({ port: 0, quiet: true, ...hooks });
   await server.listen();
   return server.webSocketURL;
@@ -62,7 +64,14 @@ describe('createCollabSession (real Hocuspocus server)', () => {
       },
       connected: async ({ connection }) => {
         connection.sendStateless(
-          encodeServerMessage({ type: 'session.state', status: 'live', startedAt: 1000, durationSec: 60, extensionSec: 0, serverNow: Date.now() + 5000 }),
+          encodeServerMessage({
+            type: 'session.state',
+            status: 'live',
+            startedAt: 1000,
+            durationSec: 60,
+            extensionSec: 0,
+            serverNow: Date.now() + 5000,
+          }),
         );
       },
     });

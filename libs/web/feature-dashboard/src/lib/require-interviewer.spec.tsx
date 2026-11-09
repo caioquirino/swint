@@ -13,24 +13,51 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('RequireInterviewer', () => {
   it('renders children with the current user', async () => {
-    renderWithApi(<RequireInterviewer><WhoAmI /></RequireInterviewer>, { api: fakeApi({ me: { get: async () => me } }) });
+    renderWithApi(
+      <RequireInterviewer>
+        <WhoAmI />
+      </RequireInterviewer>,
+      { api: fakeApi({ me: { get: async () => me } }) },
+    );
     expect(await screen.findByText('hello Ada')).toBeInTheDocument();
   });
 
   it('sends anonymous visitors to the login page, returning to where they were', async () => {
     const assign = vi.spyOn(navigation, 'assign').mockImplementation(() => undefined);
-    renderWithApi(<RequireInterviewer><WhoAmI /></RequireInterviewer>, {
-      api: fakeApi({ me: { get: async () => { throw orpcError('UNAUTHORIZED'); } } }),
-      path: '/templates/new?x=1',
-    });
+    renderWithApi(
+      <RequireInterviewer>
+        <WhoAmI />
+      </RequireInterviewer>,
+      {
+        api: fakeApi({
+          me: {
+            get: async () => {
+              throw orpcError('UNAUTHORIZED');
+            },
+          },
+        }),
+        path: '/templates/new?x=1',
+      },
+    );
     expect(await screen.findByText(/redirecting to sign-in/i)).toBeInTheDocument();
     expect(assign).toHaveBeenCalledWith('/auth/login?returnTo=%2Ftemplates%2Fnew%3Fx%3D1');
   });
 
   it('explains when the account is not allowed', async () => {
-    renderWithApi(<RequireInterviewer><WhoAmI /></RequireInterviewer>, {
-      api: fakeApi({ me: { get: async () => { throw orpcError('FORBIDDEN'); } } }),
-    });
+    renderWithApi(
+      <RequireInterviewer>
+        <WhoAmI />
+      </RequireInterviewer>,
+      {
+        api: fakeApi({
+          me: {
+            get: async () => {
+              throw orpcError('FORBIDDEN');
+            },
+          },
+        }),
+      },
+    );
     expect(await screen.findByRole('heading', { name: /no access/i })).toBeInTheDocument();
   });
 });

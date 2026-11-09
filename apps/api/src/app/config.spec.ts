@@ -26,9 +26,7 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...prod, COOKIE_SECRET: undefined })).toThrow(/COOKIE_SECRET/);
   });
   it('rejects production with the dev cookie secret set explicitly', () => {
-    expect(() => loadConfig({ ...prod, COOKIE_SECRET: 'dev-only-cookie-secret-change-me-0123456789' })).toThrow(
-      /COOKIE_SECRET/,
-    );
+    expect(() => loadConfig({ ...prod, COOKIE_SECRET: 'dev-only-cookie-secret-change-me-0123456789' })).toThrow(/COOKIE_SECRET/);
   });
   it('rejects production without OIDC_CLIENT_SECRET', () => {
     expect(() => loadConfig({ ...prod, OIDC_CLIENT_SECRET: undefined })).toThrow(/OIDC_CLIENT_SECRET/);

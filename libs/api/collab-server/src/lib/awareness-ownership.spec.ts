@@ -5,7 +5,11 @@ const view = (own: number[], others: number[]) => ({ own: new Set(own), ownedByO
 
 describe('dropForeignClients', () => {
   it('keeps own and unclaimed states, drops states owned by another connection', () => {
-    const states = new Map<number, Record<string, unknown>>([[1, { a: 1 }], [2, { a: 2 }], [3, { a: 3 }]]);
+    const states = new Map<number, Record<string, unknown>>([
+      [1, { a: 1 }],
+      [2, { a: 2 }],
+      [3, { a: 3 }],
+    ]);
     dropForeignClients(view([1], [2]), states, new Set());
     expect([...states.keys()]).toEqual([1, 3]);
   });

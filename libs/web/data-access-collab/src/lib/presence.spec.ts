@@ -5,7 +5,11 @@ import { AWARENESS_USER_FIELD } from '@swint/shared-collab-protocol';
 import { readParticipants } from './presence.js';
 
 const user = (userId: string, name: string, role: 'candidate' | 'interviewer') => ({
-  userId, name, role, color: '#1971c2', selectedElementIds: {},
+  userId,
+  name,
+  role,
+  color: '#1971c2',
+  selectedElementIds: {},
 });
 
 function peer(state: unknown): Awareness {

@@ -11,8 +11,7 @@ const me = interviewerProcedures.me.get.handler(({ context }) => ({
   roles: context.interviewer.roles,
 }));
 
-const client = (identity: Identity | null) =>
-  createRouterClient({ me: { get: me } }, { context: { identity, requestId: 'test' } });
+const client = (identity: Identity | null) => createRouterClient({ me: { get: me } }, { context: { identity, requestId: 'test' } });
 
 const interviewer: Identity = {
   kind: 'interviewer',

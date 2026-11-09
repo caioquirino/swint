@@ -1,12 +1,6 @@
 import { ORPCError } from '@orpc/server';
 import type { BoardSeed, Template, TemplateSummary } from '@swint/shared-api-contract';
-import {
-  blobKeys,
-  StaleWriteError,
-  type BlobStore,
-  type TemplateRecord,
-  type TemplatesRepo,
-} from '@swint/api-data-access-persistence';
+import { blobKeys, StaleWriteError, type BlobStore, type TemplateRecord, type TemplatesRepo } from '@swint/api-data-access-persistence';
 import { interviewerProcedures, type Clock, type IdGenerator } from '@swint/api-util-rpc';
 
 export interface TemplatesDeps {

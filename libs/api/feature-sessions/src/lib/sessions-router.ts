@@ -80,10 +80,7 @@ export function createSessionsRouter(deps: SessionsDeps) {
 
       const id = deps.newId();
       const seed = template.boardSeedKey ? await deps.blobs.getJson<BoardSeed>(template.boardSeedKey) : null;
-      await deps.blobs.putBytes(
-        blobKeys.sessionBoardLatest(orgId, id),
-        buildInitialBoardUpdate(seed ?? { elements: [] }),
-      );
+      await deps.blobs.putBytes(blobKeys.sessionBoardLatest(orgId, id), buildInitialBoardUpdate(seed ?? { elements: [] }));
 
       const invite = await issueInvite(orgId, id);
       const rec: SessionRecord = {
@@ -113,13 +110,9 @@ export function createSessionsRouter(deps: SessionsDeps) {
     }),
 
     start: p.start.handler(({ input, context }) => runCommand(context.interviewer, input.id, { type: 'start' })),
-    extend: p.extend.handler(({ input, context }) =>
-      runCommand(context.interviewer, input.id, { type: 'extend', minutes: input.minutes }),
-    ),
+    extend: p.extend.handler(({ input, context }) => runCommand(context.interviewer, input.id, { type: 'extend', minutes: input.minutes })),
     end: p.end.handler(({ input, context }) => runCommand(context.interviewer, input.id, { type: 'end' })),
-    cancel: p.cancel.handler(({ input, context }) =>
-      runCommand(context.interviewer, input.id, { type: 'cancel', reason: input.reason }),
-    ),
+    cancel: p.cancel.handler(({ input, context }) => runCommand(context.interviewer, input.id, { type: 'cancel', reason: input.reason })),
     regenerateInvite: p.regenerateInvite.handler(async ({ input, context }) => {
       const rec = await load(context.interviewer.orgId, input.id);
       if (isFinished(rec.status)) throw new ORPCError('CONFLICT', { message: 'Session is finished' });

@@ -3,10 +3,10 @@ packages:
   - 'libs/*/*'
 allowBuilds:
   nx: true
-  "@parcel/watcher": false
+  '@parcel/watcher': false
   unrs-resolver: false
   esbuild: false
   cpu-features: false
   protobufjs: false
   ssh2: false
-  "@swc/core": false
+  '@swc/core': false

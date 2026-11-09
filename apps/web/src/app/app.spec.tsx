@@ -13,7 +13,9 @@ function renderAt(path: string, api = fakeApi({})) {
   return render(
     <QueryClientProvider client={qc}>
       <ApiProvider client={api}>
-        <MemoryRouter initialEntries={[path]}><AppRoutes /></MemoryRouter>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
       </ApiProvider>
     </QueryClientProvider>,
   );
@@ -38,13 +40,31 @@ describe('AppRoutes', () => {
 
   it.each(['/', '/templates/new', '/templates/t1'])('%s requires an interviewer', async (path) => {
     const assign = vi.spyOn(navigation, 'assign').mockImplementation(() => undefined);
-    renderAt(path, fakeApi({ me: { get: async () => { throw orpcError('UNAUTHORIZED'); } } }));
+    renderAt(
+      path,
+      fakeApi({
+        me: {
+          get: async () => {
+            throw orpcError('UNAUTHORIZED');
+          },
+        },
+      }),
+    );
     await screen.findByText(/redirecting to sign-in/i);
     expect(assign).toHaveBeenCalledWith(`/auth/login?returnTo=${encodeURIComponent(path)}`);
   });
 
   it('/s/:id is open to candidates (no interviewer gate)', async () => {
-    renderAt('/s/s1', fakeApi({ room: { get: async () => { throw orpcError('FORBIDDEN', { reason: 'session_ended' }); } } }));
+    renderAt(
+      '/s/s1',
+      fakeApi({
+        room: {
+          get: async () => {
+            throw orpcError('FORBIDDEN', { reason: 'session_ended' });
+          },
+        },
+      }),
+    );
     expect(await screen.findByRole('heading', { name: 'The interview has ended' })).toBeInTheDocument();
   });
 });

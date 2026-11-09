@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  boardSeedSchema,
-  createSessionInputSchema,
-  roomViewSchema,
-  sessionSchema,
-  templateInputSchema,
-} from './schemas.js';
+import { boardSeedSchema, createSessionInputSchema, roomViewSchema, sessionSchema, templateInputSchema } from './schemas.js';
 
 const session = {
   id: '01JABCDEF0000000000000000',

@@ -10,7 +10,11 @@ describe('ui-primitives', () => {
 
   it('Button applies variant classes and forwards props', async () => {
     const onClick = vi.fn();
-    render(<Button variant="danger" onClick={onClick}>End</Button>);
+    render(
+      <Button variant="danger" onClick={onClick}>
+        End
+      </Button>,
+    );
     const button = screen.getByRole('button', { name: 'End' });
     expect(button.className).toContain('bg-red-600');
     expect(button).toHaveAttribute('type', 'button');
@@ -24,14 +28,26 @@ describe('ui-primitives', () => {
   });
 
   it('Dialog renders title and content only when open', () => {
-    const { rerender } = render(<Dialog open={false} onOpenChange={() => undefined} title="Cancel session">body</Dialog>);
+    const { rerender } = render(
+      <Dialog open={false} onOpenChange={() => undefined} title="Cancel session">
+        body
+      </Dialog>,
+    );
     expect(screen.queryByText('body')).not.toBeInTheDocument();
-    rerender(<Dialog open onOpenChange={() => undefined} title="Cancel session">body</Dialog>);
+    rerender(
+      <Dialog open onOpenChange={() => undefined} title="Cancel session">
+        body
+      </Dialog>,
+    );
     expect(screen.getByRole('dialog', { name: 'Cancel session' })).toHaveTextContent('body');
   });
 
   it('Screen shows a heading and actions', () => {
-    render(<Screen title="Interview ended" actions={<Button>Home</Button>}>Thanks</Screen>);
+    render(
+      <Screen title="Interview ended" actions={<Button>Home</Button>}>
+        Thanks
+      </Screen>,
+    );
     expect(screen.getByRole('heading', { name: 'Interview ended' })).toBeInTheDocument();
     expect(screen.getByText('Thanks')).toBeInTheDocument();
   });
