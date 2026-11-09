@@ -33,9 +33,14 @@ describe('AppRoutes', () => {
     ['/link-invalid?reason=session_ended', 'The interview has ended'],
     ['/link-invalid?reason=invite_revoked', 'This link is no longer valid'],
     ['/link-invalid?reason=<script>', 'This link is no longer valid'],
-  ])('%s', (path, heading) => {
+  ])('%s', async (path, heading) => {
     renderAt(path);
-    expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+  });
+
+  it('shows a loading screen while a route chunk loads', () => {
+    renderAt('/s/s1', fakeApi({ room: { get: () => new Promise(() => undefined) } }));
+    expect(screen.getByRole('heading', { name: 'Loading…' })).toBeInTheDocument();
   });
 
   it.each(['/', '/templates/new', '/templates/t1'])('%s requires an interviewer', async (path) => {

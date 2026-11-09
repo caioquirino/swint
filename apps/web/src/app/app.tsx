@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Link, Route, Routes, useSearchParams } from 'react-router';
 import { ApiProvider, createApiClient, createQueryClient } from '@swint/web-data-access-api';
-import { DashboardPage, InterviewerLayout } from '@swint/web-feature-dashboard';
-import { LinkInvalidScreen, SessionRoomPage } from '@swint/web-feature-session-room';
-import { TemplateEditorPage } from '@swint/web-feature-template-editor';
-import { Screen } from '@swint/web-ui-primitives';
+import { Screen, Spinner } from '@swint/web-ui-primitives';
+
+const InterviewerLayout = lazy(() => import('@swint/web-feature-dashboard').then((m) => ({ default: m.InterviewerLayout })));
+const DashboardPage = lazy(() => import('@swint/web-feature-dashboard').then((m) => ({ default: m.DashboardPage })));
+const TemplateEditorPage = lazy(() => import('@swint/web-feature-template-editor').then((m) => ({ default: m.TemplateEditorPage })));
+const SessionRoomPage = lazy(() => import('@swint/web-feature-session-room').then((m) => ({ default: m.SessionRoomPage })));
+const LinkInvalidScreen = lazy(() => import('@swint/web-feature-session-room').then((m) => ({ default: m.LinkInvalidScreen })));
 
 export function NotFound() {
   return (
@@ -32,16 +35,24 @@ function LinkInvalidRoute() {
 
 export function AppRoutes() {
   return (
-    <Routes>
-      <Route element={<InterviewerLayout />}>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/templates/new" element={<TemplateEditorPage />} />
-        <Route path="/templates/:templateId" element={<TemplateEditorPage />} />
-      </Route>
-      <Route path="/s/:sessionId" element={<SessionRoomPage />} />
-      <Route path="/link-invalid" element={<LinkInvalidRoute />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <Suspense
+      fallback={
+        <Screen title="Loading…">
+          <Spinner />
+        </Screen>
+      }
+    >
+      <Routes>
+        <Route element={<InterviewerLayout />}>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/templates/new" element={<TemplateEditorPage />} />
+          <Route path="/templates/:templateId" element={<TemplateEditorPage />} />
+        </Route>
+        <Route path="/s/:sessionId" element={<SessionRoomPage />} />
+        <Route path="/link-invalid" element={<LinkInvalidRoute />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
 

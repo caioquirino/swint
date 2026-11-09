@@ -258,6 +258,9 @@ importers:
       vite:
         specifier: ^8.0.0
         version: 8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(jiti@2.4.2)(tsx@4.23.15)(yaml@2.9.0)
+      vite-plugin-static-copy:
+        specifier: 4.1.1
+        version: 4.1.1(vite@8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(jiti@2.4.2)(tsx@4.23.15)(yaml@2.9.0))
       vitest:
         specifier: ~5.0.1
         version: 5.0.5(@types/node@22.20.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@27.4.0(supports-color@7.2.0))(vite@8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(jiti@2.4.2)(tsx@4.23.15)(yaml@2.9.0))
@@ -6784,6 +6787,10 @@ packages:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
 
+  p-map@7.1.1:
+    resolution: {integrity: sha512-6Lh3jQPLthYujSrlw6ccWXBGZTkoTCz27Hd92g79LH/kjAbgoEu0t442cCCNbegPSJsA0lwDX8z0bcKtkpA32g==}
+    engines: {node: '>=18'}
+
   p-timeout@6.1.4:
     resolution: {integrity: sha512-MyIV3ZA/PmyBN/ud8vV9XzwTrNtR4jFrObymZYnZqMmW0zA8Z17vnT0rBgFE/TlohB+YCHqXMgZzb3Csp49vqg==}
     engines: {node: '>=14.16'}
@@ -7859,6 +7866,12 @@ packages:
 
   vfile@6.0.3:
     resolution: {integrity: sha512-KzIbH/9tXat2u30jf+smMwFCsno4wHVdNmzFyL+T/L3UGqqk6JKfVqOFOZEpZSHADH1k40ab6NUIXZq422ov3Q==}
+
+  vite-plugin-static-copy@4.1.1:
+    resolution: {integrity: sha512-GrlA8YklrAfSyxJ4M3fdQLOo9oNkp56IM9FYgX/WtEgeIFkPwhu4wzpufBCIuNKCa6Fn77FkRdYxkHqV0FwjAw==}
+    engines: {node: ^22.0.0 || >=24.0.0}
+    peerDependencies:
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
 
   vite@8.3.6:
     resolution: {integrity: sha512-UI7dK29NnS54Fk+mmo7o+jI6U8Fp7hDl+X5Q1k45WH+d4dSlbLVUETGQ+hfkNgvLQGyoElPj837nZyv4MBc0VA==}
@@ -15343,6 +15356,8 @@ snapshots:
     dependencies:
       p-limit: 3.1.0
 
+  p-map@7.1.1: {}
+
   p-timeout@6.1.4: {}
 
   p-try@2.2.0: {}
@@ -16691,6 +16706,14 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
       vfile-message: 4.0.4
+
+  vite-plugin-static-copy@4.1.1(vite@8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(jiti@2.4.2)(tsx@4.23.15)(yaml@2.9.0)):
+    dependencies:
+      chokidar: 3.6.0
+      p-map: 7.1.1
+      picocolors: 1.1.1
+      tinyglobby: 0.2.17
+      vite: 8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(jiti@2.4.2)(tsx@4.23.15)(yaml@2.9.0)
 
   vite@8.3.6(@types/node@22.20.5)(esbuild@0.27.7)(jiti@2.4.2)(tsx@4.23.15)(yaml@2.9.0):
     dependencies:

@@ -1,14 +1,36 @@
 /// <reference types='vitest' />
-import { defineConfig, defaultClientConditions } from 'vite';
+import { defineConfig, defaultClientConditions, normalizePath } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { nxReadySignal } from '@nx/vite/plugins/nx-ready-signal.plugin';
-import { devProxy } from './src/dev-proxy';
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join, relative } from 'node:path';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { devProxy } from './src/dev-proxy.js';
+
+/** Excalidraw's font files (dist/prod/fonts), served at /fonts so the board never loads them from a CDN. */
+function excalidrawFontsDir(): string {
+  let dir = dirname(createRequire(import.meta.url).resolve('@excalidraw/excalidraw'));
+  while (!existsSync(join(dir, 'package.json'))) dir = dirname(dir);
+  return join(dir, 'dist', 'prod', 'fonts');
+}
+
+const fontsDir = normalizePath(excalidrawFontsDir());
+// static-copy keeps the directory structure relative to the config root (minus leading ../); strip it so files land in dist/fonts/<Family>/.
+const fontsStripBase = normalizePath(relative(import.meta.dirname, fontsDir))
+  .replace(/^(\.\.\/)+/, '')
+  .split('/').length;
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/apps/web',
-  plugins: [react(), tailwindcss(), nxReadySignal()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    viteStaticCopy({ targets: [{ src: `${fontsDir}/**/*`, dest: 'fonts', rename: { stripBase: fontsStripBase } }] }),
+    nxReadySignal(),
+  ],
   resolve: { conditions: ['swint', ...defaultClientConditions] },
   server: {
     port: 4200,
