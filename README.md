@@ -8,7 +8,7 @@ Requirements: Node 24, pnpm 12 (see `mise.toml`), Docker.
 
 ```bash
 pnpm install
-docker compose up -d                       # Keycloak :8080, DynamoDB Local :8000, S3Mock :9090
+docker compose up -d                       # Keycloak :8080, DynamoDB Local :8000, S3Mock :9090 (bound to 127.0.0.1)
 pnpm nx run-many -t serve -p api web       # API :3000 (watch mode) + web :4200 (Vite, proxies /api /auth /join /collab)
 ```
 
@@ -32,3 +32,16 @@ Tests (integration tests start their own containers via Testcontainers; Docker m
 ```bash
 pnpm nx run-many -t lint test typecheck
 ```
+
+## Full stack in containers
+
+```bash
+docker compose --profile app up -d --build --wait   # web (nginx) on http://localhost:8088, API behind it
+```
+
+Sign in as `interviewer1` / `password`. nginx serves the built SPA and proxies `/api`, `/auth`, `/join` and `/collab`
+(WebSocket) to the `api` container. The API runs with `NODE_ENV=production`, seeds the demo template and reaches
+Keycloak through `OIDC_INTERNAL_URL=http://keycloak:8080` while browsers keep using `http://localhost:8080`.
+Infra ports are bound to 127.0.0.1 only.
+
+If you changed `docker/keycloak/swint-realm.json`, re-import it with `docker compose up -d --force-recreate keycloak`.

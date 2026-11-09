@@ -19,11 +19,11 @@
       "secret": "swint-dev-secret",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:4200/auth/callback", "http://localhost:3000/auth/callback"],
-      "webOrigins": ["http://localhost:4200", "http://localhost:3000"],
+      "redirectUris": ["http://localhost:4200/auth/callback", "http://localhost:3000/auth/callback", "http://localhost:8088/auth/callback"],
+      "webOrigins": ["http://localhost:4200", "http://localhost:3000", "http://localhost:8088"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:4200/*##http://localhost:3000/*"
+        "post.logout.redirect.uris": "http://localhost:4200/*##http://localhost:3000/*##http://localhost:8088/*"
       },
       "protocolMappers": [
         {

@@ -28,3 +28,11 @@ EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=6 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:3000/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["node", "main.js"]
+
+FROM workspace AS web-build
+RUN pnpm nx run web:build
+
+FROM nginx:1.29-alpine AS web
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=web-build /repo/apps/web/dist /usr/share/nginx/html
+EXPOSE 8080
