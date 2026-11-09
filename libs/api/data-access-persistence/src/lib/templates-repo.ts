@@ -2,7 +2,7 @@ import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { StaleWriteError } from './errors.js';
 import type { TemplateRecord } from './records.js';
-import { GSI1, queryAll, stripKeys, type Table } from './table.js';
+import { GSI1, queryAll, fromItem, type Table } from './table.js';
 
 export interface TemplatesRepo {
   create(rec: TemplateRecord): Promise<void>;
@@ -25,9 +25,11 @@ export function createTemplatesRepo(table: Table): TemplatesRepo {
       await table.doc.send(new PutCommand({ TableName: table.name, Item: item(rec), ConditionExpression: 'attribute_not_exists(PK)' }));
     },
     async get(orgId, id) {
-      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: { PK: `TEMPLATE#${id}`, SK: 'META' } }));
+      const out = await table.doc.send(
+        new GetCommand({ TableName: table.name, Key: { PK: `TEMPLATE#${id}`, SK: 'META' }, ConsistentRead: true }),
+      );
       if (!out.Item || out.Item['orgId'] !== orgId) return null;
-      return stripKeys(out.Item) as TemplateRecord;
+      return fromItem<TemplateRecord>(out.Item);
     },
     async listByOrg(orgId, { includeArchived }) {
       const rows = await queryAll<Record<string, unknown>>(table, {
@@ -35,7 +37,7 @@ export function createTemplatesRepo(table: Table): TemplatesRepo {
         KeyConditionExpression: 'GSI1PK = :pk AND begins_with(GSI1SK, :prefix)',
         ExpressionAttributeValues: { ':pk': `ORG#${orgId}`, ':prefix': 'TEMPLATE#' },
       });
-      return rows.map((r) => stripKeys(r) as unknown as TemplateRecord).filter((t) => includeArchived || !t.archived);
+      return rows.map((r) => fromItem<TemplateRecord>(r)).filter((t) => includeArchived || !t.archived);
     },
     async update(rec) {
       try {

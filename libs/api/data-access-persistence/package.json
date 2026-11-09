@@ -33,8 +33,10 @@
     "@aws-sdk/client-dynamodb": "^3.1164.0",
     "@aws-sdk/lib-dynamodb": "^3.1164.0",
     "@aws-sdk/client-s3": "^3.1164.0",
-    "testcontainers": "^12.2.1",
-    "vitest": "~5.0.1",
     "@swint/shared-domain": "workspace:*"
+  },
+  "devDependencies": {
+    "testcontainers": "^12.2.1",
+    "vitest": "~5.0.1"
   }
 }

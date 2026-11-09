@@ -66,4 +66,9 @@ describe('SessionsRepo', () => {
     await sessions.create(session());
     await expect(sessions.update(session({ orgId: 'other-org' }), 1)).rejects.toBeInstanceOf(StaleWriteError);
   });
+
+  it('update of a missing session throws StaleWriteError', async () => {
+    const { sessions } = await createTestStores();
+    await expect(sessions.update(session({ id: 'nope' }), 1)).rejects.toBeInstanceOf(StaleWriteError);
+  });
 });

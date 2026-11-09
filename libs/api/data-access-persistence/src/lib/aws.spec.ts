@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { DescribeTableCommand } from '@aws-sdk/client-dynamodb';
+import { DescribeTableCommand, DescribeTimeToLiveCommand } from '@aws-sdk/client-dynamodb';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { createTestStores } from '../testing/index.js';
 import { ensureBucket, ensureTable } from './aws.js';
@@ -61,5 +61,14 @@ describe('ensureTable / ensureBucket', () => {
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).name).not.toMatch(/BucketAlready/);
     expect(sent).toEqual(['HeadBucketCommand']);
+  });
+
+  it('creates an on-demand table with an ALL-projection GSI1 and TTL on expiresAt', async () => {
+    const stores = await createTestStores();
+    const { Table } = await stores.raw.send(new DescribeTableCommand({ TableName: stores.table.name }));
+    expect(Table?.BillingModeSummary?.BillingMode).toBe('PAY_PER_REQUEST');
+    expect(Table?.GlobalSecondaryIndexes?.[0]?.Projection).toEqual({ ProjectionType: 'ALL' });
+    const ttl = await stores.raw.send(new DescribeTimeToLiveCommand({ TableName: stores.table.name }));
+    expect(ttl.TimeToLiveDescription).toMatchObject({ AttributeName: 'expiresAt', TimeToLiveStatus: 'ENABLED' });
   });
 });

@@ -18,4 +18,10 @@ describe('InvitesRepo', () => {
     await expect(invites.get('missing')).resolves.toBeNull();
     await expect(invites.revoke('missing', 1)).resolves.toBeUndefined();
   });
+
+  it('revoking a missing invite is a no-op', async () => {
+    const { invites } = await createTestStores();
+    await expect(invites.revoke('missing', 1)).resolves.toBeUndefined();
+    await expect(invites.get('missing')).resolves.toBeNull();
+  });
 });

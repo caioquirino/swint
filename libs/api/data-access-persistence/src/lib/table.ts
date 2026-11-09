@@ -24,3 +24,8 @@ export function stripKeys<T extends object>(item: T): Omit<T, 'PK' | 'SK' | 'GSI
   for (const k of ['PK', 'SK', 'GSI1PK', 'GSI1SK']) delete rest[k];
   return rest as unknown as Omit<T, 'PK' | 'SK' | 'GSI1PK' | 'GSI1SK'>;
 }
+
+/** A stored item as a typed record: key attributes removed, cast once here rather than at every call site. */
+export function fromItem<T>(item: Record<string, unknown>): T {
+  return stripKeys(item) as unknown as T;
+}

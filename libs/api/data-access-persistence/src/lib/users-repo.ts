@@ -1,6 +1,6 @@
 import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { UserRecord } from './records.js';
-import { stripKeys, type Table } from './table.js';
+import { fromItem, type Table } from './table.js';
 
 export interface UsersRepo {
   upsert(user: UserRecord): Promise<void>;
@@ -15,8 +15,8 @@ export function createUsersRepo(table: Table): UsersRepo {
       await table.doc.send(new PutCommand({ TableName: table.name, Item: { ...key(user.sub), ...user } }));
     },
     async get(sub) {
-      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: key(sub) }));
-      return out.Item ? (stripKeys(out.Item) as UserRecord) : null;
+      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: key(sub), ConsistentRead: true }));
+      return out.Item ? fromItem<UserRecord>(out.Item) : null;
     },
   };
 }

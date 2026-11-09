@@ -1,6 +1,6 @@
 import { DeleteCommand, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { AuthSessionRecord } from './records.js';
-import { stripKeys, type Table } from './table.js';
+import { fromItem, type Table } from './table.js';
 
 export interface AuthSessionsRepo {
   create(rec: AuthSessionRecord): Promise<void>;
@@ -17,9 +17,9 @@ export function createAuthSessionsRepo(table: Table): AuthSessionsRepo {
       await table.doc.send(new PutCommand({ TableName: table.name, Item: { ...key(rec.idHash), ...rec } }));
     },
     async get(idHash, nowMs) {
-      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: key(idHash) }));
+      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: key(idHash), ConsistentRead: true }));
       if (!out.Item) return null;
-      const rec = stripKeys(out.Item) as AuthSessionRecord;
+      const rec = fromItem<AuthSessionRecord>(out.Item);
       return rec.expiresAt * 1000 > nowMs ? rec : null;
     },
     async delete(idHash) {

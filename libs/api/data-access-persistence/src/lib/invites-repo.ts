@@ -1,7 +1,7 @@
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { InviteRecord } from './records.js';
-import { stripKeys, type Table } from './table.js';
+import { fromItem, type Table } from './table.js';
 
 export interface InvitesRepo {
   create(rec: InviteRecord): Promise<void>;
@@ -23,8 +23,8 @@ export function createInvitesRepo(table: Table): InvitesRepo {
       );
     },
     async get(hash) {
-      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: key(hash) }));
-      return out.Item ? (stripKeys(out.Item) as unknown as InviteRecord) : null;
+      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: key(hash), ConsistentRead: true }));
+      return out.Item ? fromItem<InviteRecord>(out.Item) : null;
     },
     async revoke(hash, atMs) {
       try {

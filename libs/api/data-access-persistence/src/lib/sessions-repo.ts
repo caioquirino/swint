@@ -3,7 +3,7 @@ import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { SessionStatus } from '@swint/shared-domain';
 import { StaleWriteError } from './errors.js';
 import type { SessionRecord } from './records.js';
-import { GSI1, queryAll, stripKeys, type Table } from './table.js';
+import { GSI1, queryAll, fromItem, type Table } from './table.js';
 
 export interface SessionsRepo {
   create(rec: SessionRecord): Promise<void>;
@@ -35,9 +35,11 @@ export function createSessionsRepo(table: Table): SessionsRepo {
       );
     },
     async get(orgId, id) {
-      const out = await table.doc.send(new GetCommand({ TableName: table.name, Key: { PK: `SESSION#${id}`, SK: 'META' } }));
+      const out = await table.doc.send(
+        new GetCommand({ TableName: table.name, Key: { PK: `SESSION#${id}`, SK: 'META' }, ConsistentRead: true }),
+      );
       if (!out.Item || out.Item['orgId'] !== orgId) return null;
-      return stripKeys(out.Item) as unknown as SessionRecord;
+      return fromItem<SessionRecord>(out.Item);
     },
     async listByOrg(orgId, { status }) {
       const rows = await queryAll<Record<string, unknown>>(table, {
@@ -46,7 +48,7 @@ export function createSessionsRepo(table: Table): SessionsRepo {
         ExpressionAttributeValues: { ':pk': `ORG#${orgId}`, ':prefix': 'SESSION#' },
         ScanIndexForward: false,
       });
-      return rows.map((r) => stripKeys(r) as unknown as SessionRecord).filter((s) => !status || s.status === status);
+      return rows.map((r) => fromItem<SessionRecord>(r)).filter((s) => !status || s.status === status);
     },
     async update(next, expectedVersion) {
       const stored: SessionRecord = { ...next, version: expectedVersion + 1 };
