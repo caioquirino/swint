@@ -6,7 +6,7 @@ import WebSocket from 'ws';
 import { Hocuspocus } from '@hocuspocus/server';
 import type { Identity } from '@swint/api-util-rpc';
 import type { CollabContext, CollabLogger } from './collab-server.js';
-import { attachUpgradeHandler, MAX_PAYLOAD_BYTES, type UpgradeHandle } from './upgrade.js';
+import { attachUpgradeHandler, MAX_PAYLOAD_BYTES, type UpgradeHandle, type UpgradeHandlerOptions } from './upgrade.js';
 
 const ada: Identity = { kind: 'interviewer', sub: 'sub-1', name: 'Ada', email: null, orgId: 'default', roles: ['interviewer'] };
 const logger: CollabLogger = { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined };
@@ -121,5 +121,100 @@ describe('upgrade handler hardening', () => {
     expect(await closed).toBe(1009);
     await serverStillWorks();
     expect(faults).toEqual([]);
+  });
+});
+
+/** A Hocuspocus stand-in: these tests are about the socket layer, not the Yjs protocol. */
+const stubHocuspocus = {
+  handleConnection: () => ({ handleMessage: () => undefined, handleClose: () => undefined, touch: () => undefined }),
+} as unknown as Hocuspocus<CollabContext>;
+
+async function startWith(opts: Partial<UpgradeHandlerOptions>) {
+  const server = createServer((_q, r) => r.end('ok'));
+  const h = attachUpgradeHandler(server, {
+    path: '/collab',
+    hocuspocus: stubHocuspocus,
+    resolveIdentity: (c) => resolver(c),
+    logger,
+    ...opts,
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  const p = (server.address() as AddressInfo).port;
+  return {
+    url: `ws://127.0.0.1:${p}/collab`,
+    close: async () => {
+      await h.close();
+      server.closeAllConnections();
+      await new Promise<void>((r) => server.close(() => r()));
+    },
+  };
+}
+
+/** 101 when the socket opens, otherwise the HTTP status of the refused upgrade. */
+function outcome(ws: WebSocket): Promise<number> {
+  return new Promise((resolve) => {
+    ws.once('error', () => undefined);
+    ws.once('open', () => resolve(101));
+    ws.once('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
+  });
+}
+const closedWith = (ws: WebSocket) =>
+  new Promise<{ code: number; reason: string }>((r) => ws.once('close', (code, reason) => r({ code, reason: reason.toString() })));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe('socket policy', () => {
+  it('refuses a browser Origin outside the allowlist with 403; allows listed and absent Origins', async () => {
+    const s = await startWith({ allowedOrigins: ['http://app.test'] });
+    const evil = new WebSocket(s.url, { headers: { cookie: 'ada' }, origin: 'http://evil.test' });
+    const ok = new WebSocket(s.url, { headers: { cookie: 'ada' }, origin: 'http://app.test' });
+    const noOrigin = new WebSocket(s.url, { headers: { cookie: 'ada' } });
+    expect(await Promise.all([outcome(evil), outcome(ok), outcome(noOrigin)])).toEqual([403, 101, 101]);
+    [evil, ok, noOrigin].forEach((w) => w.terminate());
+    await s.close();
+  });
+
+  it('terminates a socket that stops answering pings and keeps one that answers', async () => {
+    const s = await startWith({ pingIntervalMs: 50 });
+    const silent = new WebSocket(s.url, { headers: { cookie: 'ada' }, autoPong: false });
+    const healthy = new WebSocket(s.url, { headers: { cookie: 'ada' } });
+    expect(await Promise.all([outcome(silent), outcome(healthy)])).toEqual([101, 101]);
+    const silentClosed = closedWith(silent);
+    await expect(silentClosed).resolves.toMatchObject({ code: 1006 });
+    await sleep(200);
+    expect(healthy.readyState).toBe(WebSocket.OPEN);
+    healthy.terminate();
+    await s.close();
+  });
+
+  it('closes a socket that exceeds its message budget with 1008 rate_limited', async () => {
+    const s = await startWith({ messageRate: { ratePerSec: 1, burst: 3 } });
+    const ws = new WebSocket(s.url, { headers: { cookie: 'ada' } });
+    expect(await outcome(ws)).toBe(101);
+    const closed = closedWith(ws);
+    for (let i = 0; i < 10; i++) ws.send(new Uint8Array([0]));
+    await expect(closed).resolves.toEqual({ code: 1008, reason: 'rate_limited' });
+    await s.close();
+  });
+
+  it('closes a socket whose identity no longer resolves with 1008 unauthenticated', async () => {
+    const s = await startWith({ revalidateIntervalMs: 50 });
+    const ws = new WebSocket(s.url, { headers: { cookie: 'ada' } });
+    expect(await outcome(ws)).toBe(101);
+    await sleep(150);
+    expect(ws.readyState).toBe(WebSocket.OPEN); // still valid: kept
+    const closed = closedWith(ws);
+    resolver = async () => null; // signed out
+    await expect(closed).resolves.toEqual({ code: 1008, reason: 'unauthenticated' });
+    await s.close();
+  });
+
+  it('closes an interviewer socket whose interviewer role was removed', async () => {
+    const s = await startWith({ revalidateIntervalMs: 50 });
+    const ws = new WebSocket(s.url, { headers: { cookie: 'ada' } });
+    expect(await outcome(ws)).toBe(101);
+    const closed = closedWith(ws);
+    resolver = async () => ({ ...ada, roles: [] });
+    await expect(closed).resolves.toEqual({ code: 1008, reason: 'unauthenticated' });
+    await s.close();
   });
 });

@@ -175,6 +175,8 @@ export async function createApp(
       resolveIdentity: resolveIdentityFromCookieHeader,
       clock,
       logger: collabLogger(server.log.child({ component: 'collab' })),
+      allowedOrigins: [new URL(config.publicBaseUrl).origin],
+      revalidateIntervalMs: config.collabRevalidateMs,
     });
     eventsTarget.current = composeEvents(server.log, collab.events, overrides.events);
     // The upgrade listener must exist before listen().

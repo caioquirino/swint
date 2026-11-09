@@ -1,16 +1,26 @@
 import type { IncomingMessage, Server } from 'node:http';
 import type { Duplex } from 'node:stream';
-import { WebSocketServer } from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import type { Hocuspocus } from '@hocuspocus/server';
 import type { CookieHeaderIdentityResolver } from '@swint/api-feature-auth';
 import type { Identity } from '@swint/api-util-rpc';
 import type { CollabContext, CollabLogger } from './collab-server.js';
+import { createTokenBucket, type TokenBucket } from './rate-limit.js';
+import { stillAuthorized } from './still-authorized.js';
 
 export interface UpgradeHandlerOptions {
   path: string;
   hocuspocus: Hocuspocus<CollabContext>;
   resolveIdentity: CookieHeaderIdentityResolver;
   logger: CollabLogger;
+  /** Browser Origins allowed to open a socket. Undefined disables the check; a request without Origin (non-browser) is allowed. */
+  allowedOrigins?: readonly string[];
+  /** Ping interval; a socket that misses a pong by the next tick is terminated. Default 25000. */
+  pingIntervalMs?: number;
+  /** How often each socket's upgrade cookies are re-resolved; sockets that lost access are closed (1008). Default 60000. */
+  revalidateIntervalMs?: number;
+  /** Per-socket inbound message budget. Default DEFAULT_MESSAGE_RATE. */
+  messageRate?: { ratePerSec: number; burst: number };
 }
 
 export interface UpgradeHandle {
@@ -19,6 +29,13 @@ export interface UpgradeHandle {
 
 /** Largest WebSocket frame accepted (ws defaults to 100 MiB). */
 export const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024;
+
+export const DEFAULT_PING_INTERVAL_MS = 25_000;
+export const DEFAULT_REVALIDATE_INTERVAL_MS = 60_000;
+export const DEFAULT_MESSAGE_RATE = { ratePerSec: 200, burst: 1000 } as const;
+/** Non-terminal for clients: they reconnect, and a reconnect without a valid identity gets HTTP 401. */
+export const UNAUTHENTICATED_CLOSE = { code: 1008, reason: 'unauthenticated' } as const;
+export const RATE_LIMITED_CLOSE = { code: 1008, reason: 'rate_limited' } as const;
 
 /** Parses a request target defensively; `null` when it is not a valid URL. */
 function parseTarget(rawUrl: string | undefined): URL | null {
@@ -48,6 +65,14 @@ export function toWebRequest(req: IncomingMessage): Request {
 export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOptions): UpgradeHandle {
   const { path, hocuspocus, resolveIdentity, logger } = opts;
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD_BYTES });
+  interface SocketState {
+    cookie: string | undefined;
+    identity: Identity;
+    alive: boolean;
+    bucket: TokenBucket;
+  }
+  const live = new Map<WebSocket, SocketState>();
+  const rate = opts.messageRate ?? DEFAULT_MESSAGE_RATE;
 
   // Must never throw: an exception escaping an 'upgrade' listener kills the process.
   let closed = false;
@@ -69,6 +94,14 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
     if (url.pathname !== path) {
       // Leave it to other upgrade handlers; nobody else listening means nobody will answer.
       if (httpServer.listenerCount('upgrade') <= 1) socket.destroy();
+      return;
+    }
+    const origin = req.headers.origin;
+    if (opts.allowedOrigins && origin !== undefined && !opts.allowedOrigins.includes(origin)) {
+      logger.info({ reason: 'origin_not_allowed', origin }, 'collab upgrade refused');
+      socket.on('error', () => undefined);
+      socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      socket.destroy();
       return;
     }
 
@@ -99,9 +132,25 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
       wss.handleUpgrade(req, socket, head, (ws) => {
         try {
           const client = hocuspocus.handleConnection(ws, toWebRequest(req), { identity: authed });
-          ws.on('message', (d) => client.handleMessage(new Uint8Array(d as Buffer)));
-          ws.on('close', (code, reason) => client.handleClose({ code, reason: reason.toString() }));
-          ws.on('pong', () => client.touch());
+          const state: SocketState = { cookie: req.headers.cookie, identity: authed, alive: true, bucket: createTokenBucket(rate) };
+          live.set(ws, state);
+          ws.on('message', (d) => {
+            if (ws.readyState !== WebSocket.OPEN) return;
+            if (!state.bucket.take()) {
+              logger.warn({ reason: RATE_LIMITED_CLOSE.reason }, 'collab: closing socket over its message budget');
+              ws.close(RATE_LIMITED_CLOSE.code, RATE_LIMITED_CLOSE.reason);
+              return;
+            }
+            client.handleMessage(new Uint8Array(d as Buffer));
+          });
+          ws.on('close', (code, reason) => {
+            live.delete(ws);
+            client.handleClose({ code, reason: reason.toString() });
+          });
+          ws.on('pong', () => {
+            state.alive = true;
+            client.touch();
+          });
           ws.on('error', (err) => logger.warn({ err }, 'collab websocket error'));
         } catch (err) {
           logger.error({ err }, 'collab upgrade: connection setup failed');
@@ -116,11 +165,55 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
     });
   };
 
+  // Liveness: a socket that did not answer the previous ping is dead (half-open TCP, sleeping laptop).
+  const pingTimer = setInterval(() => {
+    for (const [ws, state] of live) {
+      if (!state.alive) {
+        ws.terminate();
+        continue;
+      }
+      state.alive = false;
+      try {
+        ws.ping();
+      } catch {
+        ws.terminate();
+      }
+    }
+  }, opts.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS);
+  pingTimer.unref();
+
+  // Revalidation: sign-out, auth-session expiry and role removal must reach sockets opened before them.
+  let revalidating = false;
+  const revalidateTimer = setInterval(() => {
+    if (revalidating) return;
+    revalidating = true;
+    void Promise.all(
+      [...live].map(async ([ws, state]) => {
+        let fresh: Identity | null;
+        try {
+          fresh = await resolveIdentity(state.cookie);
+        } catch (err) {
+          logger.warn({ err }, 'collab: revalidation failed; keeping the socket');
+          return;
+        }
+        if (!stillAuthorized(state.identity, fresh) && ws.readyState === WebSocket.OPEN) {
+          logger.info({ reason: UNAUTHENTICATED_CLOSE.reason }, 'collab: closing a socket that lost access');
+          ws.close(UNAUTHENTICATED_CLOSE.code, UNAUTHENTICATED_CLOSE.reason);
+        }
+      }),
+    ).finally(() => {
+      revalidating = false;
+    });
+  }, opts.revalidateIntervalMs ?? DEFAULT_REVALIDATE_INTERVAL_MS);
+  revalidateTimer.unref();
+
   httpServer.on('upgrade', onUpgrade);
 
   return {
     close() {
       closed = true;
+      clearInterval(pingTimer);
+      clearInterval(revalidateTimer);
       for (const ws of wss.clients) ws.terminate();
       // The listener stays attached on purpose: with none, Node leaves late upgrade sockets dangling and
       // the HTTP server can never finish closing. It now answers them with 503.

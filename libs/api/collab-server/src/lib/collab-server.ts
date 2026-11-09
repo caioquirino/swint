@@ -35,6 +35,11 @@ export interface CollabServerDeps {
   shutdownTimeoutMs?: number;
   /** Backoff sleep for S3 write retries; defaults to setTimeout. Tests inject a fast one. */
   sleep?: (ms: number) => Promise<void>;
+  /** See UpgradeHandlerOptions. */
+  allowedOrigins?: readonly string[];
+  pingIntervalMs?: number;
+  revalidateIntervalMs?: number;
+  messageRate?: { ratePerSec: number; burst: number };
 }
 
 export interface CollabServer {
@@ -381,7 +386,18 @@ export function createCollabServer(deps: CollabServerDeps): CollabServer {
       },
     },
     attach(httpServer, path = '/collab') {
-      handles.push(attachUpgradeHandler(httpServer, { path, hocuspocus, resolveIdentity: deps.resolveIdentity, logger }));
+      handles.push(
+        attachUpgradeHandler(httpServer, {
+          path,
+          hocuspocus,
+          resolveIdentity: deps.resolveIdentity,
+          logger,
+          allowedOrigins: deps.allowedOrigins,
+          pingIntervalMs: deps.pingIntervalMs,
+          revalidateIntervalMs: deps.revalidateIntervalMs,
+          messageRate: deps.messageRate,
+        }),
+      );
     },
     async close() {
       const total = deps.shutdownTimeoutMs ?? 8000;

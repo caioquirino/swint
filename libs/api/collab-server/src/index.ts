@@ -4,3 +4,5 @@ export * from './lib/upgrade.js';
 export * from './lib/collab-server.js';
 export * from './lib/types.js';
 export * from './lib/doc-store.js';
+export * from './lib/rate-limit.js';
+export * from './lib/still-authorized.js';

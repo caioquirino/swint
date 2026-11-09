@@ -59,4 +59,10 @@ describe('loadConfig', () => {
     expect(loadConfig({ NODE_ENV: 'test' }).oidcInternalUrl).toBeUndefined();
     expect(loadConfig({ NODE_ENV: 'test', OIDC_INTERNAL_URL: 'http://keycloak:8080/' }).oidcInternalUrl).toBe('http://keycloak:8080');
   });
+
+  it('reads COLLAB_REVALIDATE_MS (default 60000, minimum 1000)', () => {
+    expect(loadConfig({ NODE_ENV: 'test' }).collabRevalidateMs).toBe(60_000);
+    expect(loadConfig({ NODE_ENV: 'test', COLLAB_REVALIDATE_MS: '2000' }).collabRevalidateMs).toBe(2000);
+    expect(() => loadConfig({ NODE_ENV: 'test', COLLAB_REVALIDATE_MS: '10' })).toThrow(/COLLAB_REVALIDATE_MS/);
+  });
 });
