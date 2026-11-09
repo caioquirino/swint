@@ -1,0 +1,16 @@
+{
+  "name": "web-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "tags": [
+      "scope:web",
+      "type:e2e"
+    ],
+    "implicitDependencies": [
+      "web",
+      "api"
+    ]
+  }
+}
