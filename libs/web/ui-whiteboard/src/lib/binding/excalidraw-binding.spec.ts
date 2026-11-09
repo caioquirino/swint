@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
 import { AWARENESS_USER_FIELD, getBoardElements, type SyncedElement } from '@swint/shared-collab-protocol';
-import { ExcalidrawBinding, POINTER_INTERVAL_MS, type ExcalidrawFns, type SceneApi, type Scheduler } from './excalidraw-binding.js';
+import {
+  ExcalidrawBinding,
+  UNSUPPORTED_ELEMENT_MESSAGE,
+  POINTER_INTERVAL_MS,
+  type ExcalidrawFns,
+  type SceneApi,
+  type Scheduler,
+} from './excalidraw-binding.js';
 import { createPeers } from '../../testing/test-peers.js';
 
 const el = (id: string, version: number, extra: Partial<SyncedElement> = {}): SyncedElement => ({
@@ -221,5 +228,32 @@ describe('ExcalidrawBinding', () => {
     sched.frame();
     flush();
     expect(apiA.updateScene).not.toHaveBeenCalled();
+  });
+});
+
+describe('unsupported elements', () => {
+  it('removes images and embeds from the local scene with a toast, and never syncs them', () => {
+    const { b, flush, sched, apiA, bindA } = setup();
+    const setToast = vi.fn();
+    (apiA as SceneApi).setToast = setToast;
+    const image = el('img', 1, { type: 'image' });
+    const embed = el('emb', 1, { type: 'embeddable' });
+    bindA.handleChange([el('r', 1), image, embed], {});
+    sched.frame();
+    flush();
+    const last = apiA.updateScene.mock.calls.at(-1)?.[0] as { elements: SyncedElement[]; captureUpdate: string };
+    expect(last.elements.map((e) => e.id)).toEqual(['r']);
+    expect(last.captureUpdate).toBe('NEVER');
+    expect(setToast).toHaveBeenCalledWith({ message: UNSUPPORTED_ELEMENT_MESSAGE });
+    expect([...getBoardElements(b).keys()]).toEqual(['r']);
+  });
+
+  it('ignores deleted unsupported elements', () => {
+    const { flush, sched, apiA, bindA } = setup();
+    bindA.handleChange([el('r', 1), el('img', 2, { type: 'image', isDeleted: true })], {});
+    sched.frame();
+    flush();
+    // The constructor's awareness pass calls updateScene({ collaborators }); only scene writes matter here.
+    expect(apiA.updateScene.mock.calls.filter(([s]) => 'elements' in (s as object))).toHaveLength(0);
   });
 });

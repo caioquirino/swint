@@ -4,6 +4,11 @@ import type { SyncedElement } from './documents.js';
 /** Element types allowed on the board. Images are disabled in v1 (spec §7.2). */
 export const BOARD_ELEMENT_TYPES = ['rectangle', 'diamond', 'ellipse', 'arrow', 'line', 'freedraw', 'text', 'frame'] as const;
 
+/** Whether an Excalidraw element type may live on the shared board (no images or embeds in v1). */
+export function isSupportedElementType(type: unknown): boolean {
+  return typeof type === 'string' && (BOARD_ELEMENT_TYPES as readonly string[]).includes(type);
+}
+
 const point = z.tuple([z.number(), z.number()]);
 
 /**

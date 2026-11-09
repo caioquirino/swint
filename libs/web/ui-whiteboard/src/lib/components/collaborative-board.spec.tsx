@@ -13,6 +13,7 @@ const api = {
 let lastProps: Record<string, unknown> = {};
 
 vi.mock('@excalidraw/excalidraw/index.css', () => ({}));
+vi.mock('./collaborative-board.css', () => ({}));
 vi.mock('@excalidraw/excalidraw', () => ({
   CaptureUpdateAction: { NEVER: 'NEVER', IMMEDIATELY: 'IMMEDIATELY', EVENTUALLY: 'EVENTUALLY' },
   reconcileElements: (_l: unknown[], r: unknown[]) => r,
@@ -82,5 +83,13 @@ describe('CollaborativeBoard', () => {
     expect(svg.type).toBe('image/svg+xml');
     const json = await handle.exportAs('excalidraw');
     expect(await readText(json)).toContain('excalidraw');
+  });
+
+  it('exposes the number of visible elements for end-to-end tests', () => {
+    render(<CollaborativeBoard doc={new Y.Doc()} awareness={null} readOnly={false} />);
+    act(() => {
+      (lastProps['onChange'] as (els: unknown[], s: unknown) => void)([rect, { ...rect, id: 'gone', isDeleted: true }], {});
+    });
+    expect(screen.getByTestId('board')).toHaveAttribute('data-element-count', '1');
   });
 });

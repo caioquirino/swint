@@ -1,6 +1,12 @@
 import type * as Y from 'yjs';
 import type { Awareness } from 'y-protocols/awareness';
-import { AWARENESS_USER_FIELD, readAwarenessUser, type AwarenessUser, type SyncedElement } from '@swint/shared-collab-protocol';
+import {
+  AWARENESS_USER_FIELD,
+  isSupportedElementType,
+  readAwarenessUser,
+  type AwarenessUser,
+  type SyncedElement,
+} from '@swint/shared-collab-protocol';
 import { BoardSync } from './board-sync.js';
 
 /** ~30 pointer updates per second (spec §7.3). */
@@ -19,7 +25,11 @@ export interface SceneApi {
   updateScene(scene: { elements?: readonly SyncedElement[]; collaborators?: Map<string, SceneCollaborator>; captureUpdate?: string }): void;
   getSceneElementsIncludingDeleted(): readonly SyncedElement[];
   getAppState(): unknown;
+  /** Excalidraw's toast; optional so fakes can omit it. */
+  setToast?(toast: { message: string } | null): void;
 }
+
+export const UNSUPPORTED_ELEMENT_MESSAGE = 'Images and embeds are not supported on the shared board.';
 
 /** Excalidraw functions, injected so the binding is testable without the Excalidraw bundle. */
 export interface ExcalidrawFns {
@@ -118,10 +128,16 @@ export class ExcalidrawBinding {
 
   private readonly flush = (): void => {
     this.frame = null;
-    const scene = this.pendingScene;
+    let scene = this.pendingScene;
     this.pendingScene = null;
     if (!scene || this.destroyed || this.readOnly) return;
-    // BoardSync drops invalid elements, which includes images (disabled in v1).
+    const unsupported = new Set(scene.filter((e) => !e.isDeleted && !isSupportedElementType(e.type)).map((e) => e.id));
+    if (unsupported.size > 0) {
+      // Images and embeds would show locally but never sync (BoardSync rejects them): take them off the scene.
+      scene = scene.filter((e) => !unsupported.has(e.id));
+      this.o.api.updateScene({ elements: scene, captureUpdate: this.o.fns.captureNever });
+      this.o.api.setToast?.({ message: UNSUPPORTED_ELEMENT_MESSAGE });
+    }
     this.sync.pushLocal(scene);
   };
 

@@ -1,0 +1,4 @@
+/* v1 boards hold no embeds; the binding also strips any that slip through (e.g. pasted). */
+.swint-board [data-testid='toolbar-embeddable'] {
+  display: none;
+}

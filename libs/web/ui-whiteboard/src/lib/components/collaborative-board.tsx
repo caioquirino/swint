@@ -6,6 +6,7 @@ import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import '@excalidraw/excalidraw/index.css';
 import type { SyncedElement } from '@swint/shared-collab-protocol';
 import { ExcalidrawBinding, type ExcalidrawFns, type SceneApi } from '../binding/excalidraw-binding.js';
+import './collaborative-board.css';
 import { exportBoard, type ExportFormat } from '../export.js';
 
 /** The real Excalidraw functions. Casts happen here, once, at the boundary to Excalidraw's branded types. */
@@ -33,6 +34,7 @@ const hasImageFile = (event: ClipboardEvent | null): boolean =>
 
 export function CollaborativeBoard({ doc, awareness, readOnly, onReady }: CollaborativeBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const bindingRef = useRef<ExcalidrawBinding | null>(null);
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
@@ -56,13 +58,17 @@ export function CollaborativeBoard({ doc, awareness, readOnly, onReady }: Collab
   }, [readOnly]);
 
   return (
-    <div className="h-full w-full" data-testid="board">
+    <div ref={containerRef} className="swint-board h-full w-full" data-testid="board" data-element-count="0">
       <Excalidraw
         excalidrawAPI={setApi}
         isCollaborating
         viewModeEnabled={readOnly}
         UIOptions={{ tools: { image: false } }}
-        onChange={(elements, appState) => bindingRef.current?.handleChange(elements as unknown as readonly SyncedElement[], appState)}
+        onChange={(elements, appState) => {
+          // Written to the DOM directly (no re-render): e2e tests read it to see remote edits arrive.
+          if (containerRef.current) containerRef.current.dataset['elementCount'] = String(elements.filter((e) => !e.isDeleted).length);
+          bindingRef.current?.handleChange(elements as unknown as readonly SyncedElement[], appState);
+        }}
         onPointerUpdate={({ pointer }) => bindingRef.current?.handlePointer(pointer)}
         onPaste={(_data, event) => !hasImageFile(event)}
       />

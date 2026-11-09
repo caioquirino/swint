@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidBoardElement } from './board-validation.js';
+import { BOARD_ELEMENT_TYPES, isSupportedElementType, isValidBoardElement } from './board-validation.js';
 
 const rect = {
   id: 'r1',
@@ -48,5 +48,12 @@ describe('isValidBoardElement', () => {
     ['null', null],
   ])('rejects %s', (_label, value) => {
     expect(isValidBoardElement(value)).toBe(false);
+  });
+});
+
+describe('isSupportedElementType', () => {
+  it('accepts the v1 drawing types and rejects images and embeds', () => {
+    for (const t of BOARD_ELEMENT_TYPES) expect(isSupportedElementType(t)).toBe(true);
+    for (const t of ['image', 'embeddable', 'iframe', 'magicframe', undefined, 3]) expect(isSupportedElementType(t)).toBe(false);
   });
 });
