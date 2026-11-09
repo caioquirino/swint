@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/out-tsc
+**/test-output
+**/coverage
+**/*.tsbuildinfo
+.nx
+.git
+.superpowers
+.openidea
+.vscode
+.claude
+docs
+.env
+.env.*
