@@ -1,0 +1,12 @@
+**/dist
+**/out-tsc
+**/test-output
+**/coverage
+.nx/cache
+.nx/workspace-data
+pnpm-lock.yaml
+docs/superpowers/
+.superpowers/
+.openidea/
+.vscode/
+.claude/
