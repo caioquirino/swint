@@ -9,6 +9,7 @@ const api = {
   getSceneElements: vi.fn(() => []),
   getAppState: vi.fn(() => ({})),
   getFiles: vi.fn(() => ({})),
+  updateLibrary: vi.fn(),
 };
 let lastProps: Record<string, unknown> = {};
 
@@ -91,5 +92,22 @@ describe('CollaborativeBoard', () => {
       (lastProps['onChange'] as (els: unknown[], s: unknown) => void)([rect, { ...rect, id: 'gone', isDeleted: true }], {});
     });
     expect(screen.getByTestId('board')).toHaveAttribute('data-element-count', '1');
+  });
+
+  it('starts with the Normal font, clean lines and our library, and keeps the library fixed', async () => {
+    const { SWINT_LIBRARY } = await import('../library/swint-library.js');
+    render(<CollaborativeBoard doc={new Y.Doc()} awareness={null} readOnly={false} />);
+    const initialData = lastProps['initialData'] as { appState: Record<string, unknown>; libraryItems: unknown };
+    expect(initialData.appState).toMatchObject({ currentItemFontFamily: 6, currentItemRoughness: 0 });
+    expect(initialData.libraryItems).toBe(SWINT_LIBRARY);
+    act(() => {
+      (lastProps['onLibraryChange'] as (items: unknown[]) => void)([...SWINT_LIBRARY, { id: 'mine' }]);
+    });
+    expect(api.updateLibrary).toHaveBeenCalledWith({ libraryItems: SWINT_LIBRARY, merge: false });
+    api.updateLibrary.mockClear();
+    act(() => {
+      (lastProps['onLibraryChange'] as (items: unknown[]) => void)(SWINT_LIBRARY);
+    });
+    expect(api.updateLibrary).not.toHaveBeenCalled();
   });
 });

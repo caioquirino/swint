@@ -7,6 +7,8 @@ import '@excalidraw/excalidraw/index.css';
 import type { SyncedElement } from '@swint/shared-collab-protocol';
 import { ExcalidrawBinding, type ExcalidrawFns, type SceneApi } from '../binding/excalidraw-binding.js';
 import './collaborative-board.css';
+import { BOARD_APP_STATE } from '../board-style.js';
+import { isSwintLibrary, SWINT_LIBRARY } from '../library/swint-library.js';
 import { exportBoard, type ExportFormat } from '../export.js';
 
 /** The real Excalidraw functions. Casts happen here, once, at the boundary to Excalidraw's branded types. */
@@ -15,6 +17,8 @@ export const excalidrawFns: ExcalidrawFns = {
     reconcileElements(local as never, remote as never, appState as never) as unknown as readonly SyncedElement[],
   restoreElements: (elements) =>
     restoreElements(elements as never, null, { refreshDimensions: false, repairBindings: false }) as unknown as readonly SyncedElement[],
+  refreshTextDimensions: (elements) =>
+    restoreElements(elements as never, null, { refreshDimensions: true, repairBindings: false }) as unknown as readonly SyncedElement[],
   captureNever: CaptureUpdateAction.NEVER,
 };
 
@@ -62,6 +66,11 @@ export function CollaborativeBoard({ doc, awareness, readOnly, onReady }: Collab
       <Excalidraw
         excalidrawAPI={setApi}
         isCollaborating
+        initialData={{ appState: BOARD_APP_STATE, libraryItems: SWINT_LIBRARY as never }}
+        // The library is ours and fixed: any addition, import or removal is undone right away.
+        onLibraryChange={(items) => {
+          if (!isSwintLibrary(items)) void api?.updateLibrary({ libraryItems: SWINT_LIBRARY as never, merge: false });
+        }}
         viewModeEnabled={readOnly}
         UIOptions={{ tools: { image: false } }}
         onChange={(elements, appState) => {

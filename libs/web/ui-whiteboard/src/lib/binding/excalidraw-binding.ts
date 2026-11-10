@@ -8,6 +8,7 @@ import {
   type SyncedElement,
 } from '@swint/shared-collab-protocol';
 import { BoardSync } from './board-sync.js';
+import { enforceBoardStyle } from '../board-style.js';
 
 /** ~30 pointer updates per second (spec §7.3). */
 export const POINTER_INTERVAL_MS = 33;
@@ -26,6 +27,8 @@ export interface SceneApi {
   getSceneElementsIncludingDeleted(): readonly SyncedElement[];
   getAppState(): unknown;
   /** Excalidraw's toast; optional so fakes can omit it. */
+  /** Replaces the Excalidraw library; optional so fakes can omit it. */
+  updateLibrary?(opts: { libraryItems: unknown; merge: boolean }): unknown;
   setToast?(toast: { message: string } | null): void;
 }
 
@@ -35,6 +38,8 @@ export const UNSUPPORTED_ELEMENT_MESSAGE = 'Images and embeds are not supported 
 export interface ExcalidrawFns {
   reconcileElements(local: readonly SyncedElement[], remote: readonly SyncedElement[], appState: unknown): readonly SyncedElement[];
   restoreElements(elements: readonly SyncedElement[]): readonly SyncedElement[];
+  /** Re-measures text elements (font changes alter metrics). */
+  refreshTextDimensions(elements: readonly SyncedElement[]): readonly SyncedElement[];
   /** CaptureUpdateAction.NEVER: remote updates must never enter the local undo stack. */
   captureNever: string;
 }
@@ -138,6 +143,7 @@ export class ExcalidrawBinding {
       this.o.api.updateScene({ elements: scene, captureUpdate: this.o.fns.captureNever });
       this.o.api.setToast?.({ message: UNSUPPORTED_ELEMENT_MESSAGE });
     }
+    scene = enforceBoardStyle(scene, this.o.api, this.o.fns);
     this.sync.pushLocal(scene);
   };
 

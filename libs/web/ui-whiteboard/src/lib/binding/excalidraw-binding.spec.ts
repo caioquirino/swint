@@ -34,6 +34,7 @@ const fns: ExcalidrawFns = {
     return [...byId.values()];
   },
   restoreElements: (els) => els,
+  refreshTextDimensions: (els) => els,
   captureNever: 'NEVER',
 };
 
@@ -255,5 +256,19 @@ describe('unsupported elements', () => {
     flush();
     // The constructor's awareness pass calls updateScene({ collaborators }); only scene writes matter here.
     expect(apiA.updateScene.mock.calls.filter(([s]) => 'elements' in (s as object))).toHaveLength(0);
+  });
+});
+
+describe('board style', () => {
+  it('syncs local elements with clean lines and the Normal font, and fixes the local scene', () => {
+    const { b, flush, sched, apiA, bindA } = setup();
+    bindA.handleChange([el('r', 1, { roughness: 2 } as never), el('t', 1, { type: 'text', fontFamily: 5 } as never)], {});
+    sched.frame();
+    flush();
+    const synced = getBoardElements(b);
+    expect((synced.get('r') as unknown as { roughness: number }).roughness).toBe(0);
+    expect((synced.get('t') as unknown as { fontFamily: number }).fontFamily).toBe(6);
+    const written = apiA.updateScene.mock.calls.filter(([s]) => 'elements' in (s as object));
+    expect(written).toHaveLength(1);
   });
 });

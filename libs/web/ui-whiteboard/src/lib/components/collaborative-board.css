@@ -1,4 +1,18 @@
 /* v1 boards hold no embeds; the binding also strips any that slip through (e.g. pasted). */
 .swint-board [data-testid='toolbar-embeddable'] {
-  display: none;
+  display: none !important;
+}
+
+/* Board style: Normal and Code fonts only, clean lines only. */
+.swint-board [data-testid='font-family-hand-drawn'],
+.swint-board [data-testid='font-family-show-fonts'],
+.swint-board fieldset:has(input[name='sloppiness']) {
+  display: none !important;
+}
+
+/* The library is fixed: no browsing, import/export/reset/publish, or adding to it. */
+.swint-board .library-menu-browse-button,
+.swint-board .library-menu-dropdown-container,
+.swint-board li[data-testid='addToLibrary'] {
+  display: none !important;
 }
