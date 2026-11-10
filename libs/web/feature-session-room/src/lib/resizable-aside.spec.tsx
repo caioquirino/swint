@@ -104,4 +104,22 @@ describe('ResizableAside', () => {
     fireEvent.keyDown(separator(), { key: 'End' });
     expect(aside().style.width).toBe('720px');
   });
+
+  it('moves focus to the counterpart button after collapse and expand', () => {
+    render(<ResizableAside>content</ResizableAside>);
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse side panel' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Expand side panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand side panel' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Collapse side panel' }));
+  });
+
+  it('ends the drag when pointer capture is lost', () => {
+    render(<ResizableAside>content</ResizableAside>);
+    fireEvent.pointerDown(separator(), { clientX: 384, pointerId: 1 });
+    fireEvent.pointerMove(separator(), { clientX: 484, pointerId: 1 });
+    fireEvent.lostPointerCapture(separator(), { pointerId: 1 });
+    expect(loadPanelLayout().width).toBe(484);
+    fireEvent.pointerMove(separator(), { clientX: 600, pointerId: 1 });
+    expect(aside().style.width).toBe('484px');
+  });
 });

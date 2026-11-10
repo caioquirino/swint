@@ -8,7 +8,7 @@ import { isSupportedElementType } from '@swint/shared-collab-protocol';
 import type { SceneApi } from '../binding/excalidraw-binding.js';
 import { BOARD_APP_STATE, enforceBoardStyle } from '../board-style.js';
 import { isSwintLibrary, SWINT_LIBRARY } from '../library/swint-library.js';
-import { BoardMenu, boardCanvasActions } from './board-menu.js';
+import { BoardMenu, blockFileDrop, boardCanvasActions } from './board-menu.js';
 import { excalidrawFns } from './collaborative-board.js';
 
 export interface SeedBoardEditorProps {
@@ -25,6 +25,8 @@ export function SeedBoardEditor({ initialElements, onChange, theme = 'light' }: 
     <div
       className="swint-board h-[420px] w-full overflow-hidden rounded-md border border-slate-300 dark:border-slate-700"
       data-testid="seed-board"
+      onDragOverCapture={blockFileDrop}
+      onDropCapture={blockFileDrop}
     >
       <Excalidraw
         excalidrawAPI={setApi}

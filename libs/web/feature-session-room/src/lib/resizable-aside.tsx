@@ -34,6 +34,9 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
   widthShown.current = width;
   const committed = useRef(layout);
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
+  const collapseRef = useRef<HTMLButtonElement>(null);
+  const expandRef = useRef<HTMLButtonElement>(null);
+  const firstRender = useRef(true);
   const onChangeRef = useRef(onLayoutChange);
   onChangeRef.current = onLayoutChange;
 
@@ -41,6 +44,15 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
   useEffect(() => {
     if (commits > 0) onChangeRef.current?.();
   }, [commits]);
+
+  // Collapsing hides the focused button and expanding unmounts the rail: hand focus to the counterpart.
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    (layout.collapsed ? expandRef : collapseRef).current?.focus();
+  }, [layout.collapsed]);
 
   useEffect(() => {
     const onResize = () => {
@@ -96,7 +108,13 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
     <>
       {layout.collapsed ? (
         <div className="flex w-10 shrink-0 flex-col items-center border-r border-slate-200 bg-white py-2 dark:border-slate-800 dark:bg-slate-900">
-          <button type="button" aria-label="Expand side panel" className={BUTTON} onClick={() => commit({ ...layout, collapsed: false })}>
+          <button
+            ref={expandRef}
+            type="button"
+            aria-label="Expand side panel"
+            className={BUTTON}
+            onClick={() => commit({ ...layout, collapsed: false })}
+          >
             <Chevron direction="right" />
           </button>
         </div>
@@ -107,6 +125,7 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
         className="relative flex shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
       >
         <button
+          ref={collapseRef}
           type="button"
           aria-label="Collapse side panel"
           className={`${BUTTON} absolute right-2 top-1`}
@@ -123,11 +142,12 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
           aria-valuemax={PANEL_MAX_WIDTH}
           aria-valuenow={width}
           tabIndex={0}
-          className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize touch-none hover:bg-blue-500/40 focus-visible:bg-blue-500/60 focus-visible:outline-none"
+          className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize touch-none hover:bg-blue-500/40 focus-visible:bg-blue-600 focus-visible:outline-none"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
+          onLostPointerCapture={endDrag}
           onKeyDown={onKeyDown}
           onDoubleClick={() => commit({ width: PANEL_DEFAULT_WIDTH, collapsed: false })}
         />

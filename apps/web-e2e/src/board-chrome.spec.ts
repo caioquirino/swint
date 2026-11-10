@@ -17,11 +17,17 @@ test('candidates get no board menu, interviewers get only Save to and Export ima
     // Positive control: the toolbar rendered, the menu trigger is hidden.
     await expect(candidate.getByTestId('toolbar-rectangle')).toBeVisible();
     await expect(candidate.getByTestId('main-menu-trigger')).toBeHidden();
-    // Export-to-file shortcut is blocked: no dialog opens.
-    await candidate.getByTestId('board').click({ position: { x: 300, y: 300 } });
-    await candidate.keyboard.press('Control+Shift+E');
+    // `?` opens Excalidraw's Help unless the blocker stops it (Ctrl+Shift+E is gated by canvasActions anyway).
+    await candidate.locator('.excalidraw').first().focus();
+    await candidate.keyboard.press('Shift+Slash');
     await candidate.waitForTimeout(300);
-    await expect(candidate.locator('.Modal')).toHaveCount(0);
+    await expect(candidate.locator('.HelpDialog')).toHaveCount(0);
+    // Positive control: the same key on the interviewer (no blocker) opens Help.
+    await page.locator('.excalidraw').first().focus();
+    await page.keyboard.press('Shift+Slash');
+    await expect(page.locator('.HelpDialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.HelpDialog')).toHaveCount(0);
   } finally {
     await candidateContext.close();
   }
@@ -52,6 +58,13 @@ test('the theme switch is global, persists, drives the board and follows the sys
   await expect(page.locator('.excalidraw.theme--dark')).toBeVisible();
 
   await page.getByRole('radio', { name: 'System' }).click();
+  await expect(html).not.toHaveClass(/dark/);
+  await expect(page.locator('.excalidraw.theme--dark')).toHaveCount(0);
+  // System follows the OS in both directions.
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(html).toHaveClass(/dark/);
+  await expect(page.locator('.excalidraw.theme--dark')).toBeVisible();
+  await page.emulateMedia({ colorScheme: 'light' });
   await expect(html).not.toHaveClass(/dark/);
   await expect(page.locator('.excalidraw.theme--dark')).toHaveCount(0);
 });

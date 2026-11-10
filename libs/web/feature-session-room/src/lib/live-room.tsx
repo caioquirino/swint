@@ -117,7 +117,7 @@ export function LiveRoom({
       <ConnectionBanner state={bannerState(phase, Boolean(snapshot?.conn.everConnected))} />
       <div className="flex min-h-0 flex-1">
         <ResizableAside onLayoutChange={() => board?.refresh()}>
-          <div role="tablist" className="flex border-b border-slate-200 pr-12 dark:border-slate-800">
+          <div role="tablist" className="flex overflow-x-auto border-b border-slate-200 pr-12 dark:border-slate-800">
             {tabs.map((t) => (
               <button
                 key={t}

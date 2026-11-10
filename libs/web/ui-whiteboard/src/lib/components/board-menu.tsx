@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, type DragEvent, type RefObject } from 'react';
 import { MainMenu } from '@excalidraw/excalidraw';
 
 export type BoardMenuKind = 'none' | 'export';
@@ -37,12 +37,25 @@ const isBlockedShortcut = (event: KeyboardEvent): boolean => {
   return mod && (key === 'o' || key === 'f' || (key === 'e' && event.shiftKey));
 };
 
-const isEditable = (target: EventTarget | null): boolean =>
-  target instanceof Element && target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])') !== null;
+/** Mirrors Excalidraw: only text-like inputs, textareas and contenteditable swallow shortcuts (radios and checkboxes do not). */
+const EDITABLE =
+  'textarea, [contenteditable]:not([contenteditable="false"]), input:is([type=text],[type=number],[type=password],[type=search],[type=email],[type=url],[type=tel]):not([type=radio]), input:not([type])';
+const isEditable = (target: EventTarget | null): boolean => target instanceof Element && target.closest(EDITABLE) !== null;
 
-/** Only keys aimed at the board (or at body, where Excalidraw's canvas often leaves focus) are blocked. */
+/** Excalidraw only sees keys whose target is inside its container, so only those need blocking. */
 const isBoardTarget = (target: EventTarget | null, board: HTMLElement | null): boolean =>
-  target === document.body || (target instanceof Node && board !== null && board.contains(target));
+  target instanceof Node && board !== null && board.contains(target);
+
+/**
+ * Dropping a file on the canvas loads it as a scene (an un-gated "Open"). Use as capture handlers
+ * on the board wrapper so Excalidraw never sees file drags; text and library drags still pass.
+ */
+export const blockFileDrop = (event: DragEvent): void => {
+  if (Array.from(event.dataTransfer?.types ?? []).includes('Files')) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+};
 
 export function useBlockedShortcuts(enabled: boolean, boardRef: RefObject<HTMLElement | null>): void {
   useEffect(() => {

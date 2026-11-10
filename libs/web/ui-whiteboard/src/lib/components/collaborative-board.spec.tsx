@@ -140,7 +140,7 @@ describe('CollaborativeBoard', () => {
       saveToActiveFile: false,
       toggleTheme: null,
     };
-    const press = (init: KeyboardEventInit, target: EventTarget = document.body) => {
+    const press = (init: KeyboardEventInit, target: EventTarget = screen.getByTestId('excalidraw')) => {
       const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
       target.dispatchEvent(event);
       return event;
@@ -165,8 +165,8 @@ describe('CollaborativeBoard', () => {
       // Meta works as the modifier, and unrelated keys pass through.
       expect(press({ key: 'o', metaKey: true }).defaultPrevented).toBe(true);
       expect(press({ key: 'o' }).defaultPrevented).toBe(false);
-      // Targets inside the board are blocked too.
-      expect(press({ key: 'f', ctrlKey: true }, screen.getByTestId('excalidraw')).defaultPrevented).toBe(true);
+      // Excalidraw never sees keys aimed at body, so the browser keeps them (find-in-page).
+      expect(press({ key: 'f', ctrlKey: true }, document.body).defaultPrevented).toBe(false);
       // Outside the board (a sibling panel) the browser keeps its keys.
       const outside = document.body.appendChild(document.createElement('button'));
       for (const init of shortcuts) expect(press(init, outside).defaultPrevented).toBe(false);
@@ -187,8 +187,19 @@ describe('CollaborativeBoard', () => {
       const inner = screen.getByTestId('excalidraw').appendChild(document.createElement('textarea'));
       expect(press({ key: 'f', ctrlKey: true }, inner).defaultPrevented).toBe(false);
       inner.remove();
+      // Radios and checkboxes do not swallow shortcuts in Excalidraw, so they are not exempt; text-like inputs are.
+      for (const type of ['radio', 'checkbox']) {
+        const input = screen.getByTestId('excalidraw').appendChild(document.createElement('input'));
+        input.type = type;
+        expect(press({ key: '?', shiftKey: true }, input).defaultPrevented).toBe(true);
+        input.remove();
+      }
+      const text = screen.getByTestId('excalidraw').appendChild(document.createElement('input'));
+      text.type = 'text';
+      expect(press({ key: 'f', ctrlKey: true }, text).defaultPrevented).toBe(false);
+      text.remove();
       unmount();
-      for (const init of shortcuts) expect(press(init).defaultPrevented).toBe(false);
+      for (const init of shortcuts) expect(press(init, document.body).defaultPrevented).toBe(false);
     });
 
     it('menu export: Save to and Export image only, no keys blocked', async () => {
@@ -203,6 +214,24 @@ describe('CollaborativeBoard', () => {
       const items = (Array.isArray(lastMenuChildren) ? lastMenuChildren : [lastMenuChildren]) as { type: unknown }[];
       expect(items.map((c) => c.type)).toEqual([MainMenu.DefaultItems.Export, MainMenu.DefaultItems.SaveAsImage]);
       for (const init of shortcuts) expect(press(init).defaultPrevented).toBe(false);
+    });
+
+    it('blocks file drags before they reach Excalidraw, but lets text drags through', () => {
+      const onDrop = vi.fn();
+      render(<CollaborativeBoard doc={new Y.Doc()} awareness={null} readOnly={false} menu="export" />);
+      const child = screen.getByTestId('excalidraw');
+      child.addEventListener('drop', onDrop);
+      const fire = (type: string, types: string[]) => {
+        const event = new Event(type, { bubbles: true, cancelable: true });
+        Object.defineProperty(event, 'dataTransfer', { value: { types } });
+        child.dispatchEvent(event);
+        return event;
+      };
+      expect(fire('dragover', ['Files']).defaultPrevented).toBe(true);
+      expect(fire('drop', ['Files']).defaultPrevented).toBe(true);
+      expect(onDrop).not.toHaveBeenCalled();
+      expect(fire('drop', ['text/plain']).defaultPrevented).toBe(false);
+      expect(onDrop).toHaveBeenCalledTimes(1);
     });
 
     it('passes the theme to Excalidraw', () => {

@@ -47,7 +47,7 @@ test('the side panel resizes, collapses and keeps the board usable', async ({ pa
   await expect(page.getByRole('tab', { name: 'Instructions' })).toBeVisible();
   expect(Math.abs((await width(aside)) - asideResized)).toBeLessThanOrEqual(4);
 
-  // Pointer coordinates still line up: a drawn rectangle lands on the board.
+  // The board still accepts drawing after the resize and collapse.
   const elementCount = async () => Number(await board.getAttribute('data-element-count'));
   await expect.poll(elementCount).toBeGreaterThan(0);
   const baseline = await elementCount();

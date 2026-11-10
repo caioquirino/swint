@@ -9,7 +9,7 @@ import { ExcalidrawBinding, type ExcalidrawFns, type SceneApi } from '../binding
 import './collaborative-board.css';
 import { BOARD_APP_STATE } from '../board-style.js';
 import { isSwintLibrary, SWINT_LIBRARY } from '../library/swint-library.js';
-import { BoardMenu, boardCanvasActions, useBlockedShortcuts, type BoardMenuKind } from './board-menu.js';
+import { BoardMenu, blockFileDrop, boardCanvasActions, useBlockedShortcuts, type BoardMenuKind } from './board-menu.js';
 import { exportBoard, type ExportFormat } from '../export.js';
 
 /** The real Excalidraw functions. Casts happen here, once, at the boundary to Excalidraw's branded types. */
@@ -75,6 +75,8 @@ export function CollaborativeBoard({ doc, awareness, readOnly, menu, theme = 'li
       className={`swint-board h-full w-full${menu === 'none' ? ' swint-board--no-menu' : ''}`}
       data-testid="board"
       data-element-count="0"
+      onDragOverCapture={blockFileDrop}
+      onDropCapture={blockFileDrop}
     >
       <Excalidraw
         excalidrawAPI={setApi}
