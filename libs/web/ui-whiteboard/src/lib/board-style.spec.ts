@@ -37,7 +37,26 @@ describe('enforceBoardStyle', () => {
 
     const out = enforceBoardStyle([rect(), text(5)], api, fns);
     expect((out[1] as SyncedElement & { fontFamily: number }).fontFamily).toBe(FONT_NORMAL);
-    expect(fns.refreshTextDimensions).toHaveBeenCalledWith([out[1]]);
+    expect(fns.refreshTextDimensions).toHaveBeenCalledWith(out); // whole scene, so containers resolve
     expect(api.updateScene).toHaveBeenCalledWith({ elements: out, captureUpdate: 'NEVER' });
+  });
+
+  it('re-measures normalized text with lineHeight 1.35, keeps it bound to its container and leaves other elements alone', () => {
+    const api = { updateScene: vi.fn(), getSceneElementsIncludingDeleted: () => [], getAppState: () => ({}) };
+    const container = rect({ id: 'c', boundElements: [{ id: 't', type: 'text' }] });
+    const bound = { ...text(5), containerId: 'c', width: 10, height: 10 } as SyncedElement;
+    const fns = {
+      reconcileElements: vi.fn(),
+      restoreElements: vi.fn(),
+      // Fake re-measure: only elements whose container is in the passed scene keep containerId.
+      refreshTextDimensions: vi.fn((els: readonly SyncedElement[]) =>
+        els.map((e) => ((e as SyncedElement & { type?: string }).type === 'text' ? ({ ...e, width: 99, height: 99 } as SyncedElement) : e)),
+      ),
+      captureNever: 'NEVER',
+    };
+    const out = enforceBoardStyle([container, bound], api, fns);
+    expect(out[0]).toBe(container);
+    const t = out[1] as SyncedElement & { fontFamily: number; lineHeight: number; containerId: string; width: number };
+    expect(t).toMatchObject({ fontFamily: FONT_NORMAL, lineHeight: 1.35, containerId: 'c', width: 99 });
   });
 });

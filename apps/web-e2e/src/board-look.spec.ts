@@ -19,7 +19,10 @@ test('the board offers Normal/Code fonts only, clean lines only, and a fixed lib
 
   // Rectangle tool: no sloppiness control.
   await page.getByTestId('toolbar-rectangle').click({ force: true });
-  await expect(board.getByText('Sloppiness')).toBeHidden();
+  // Positive control: the properties panel rendered (stroke width is shown for rectangles).
+  await expect(board.getByTestId('strokeWidth-thin')).toBeVisible();
+  await expect(board.locator('input[name="sloppiness"]').first()).toBeAttached();
+  await expect(board.locator('fieldset:has(input[name="sloppiness"])')).toBeHidden();
 
   // Library: our items, no browsing or library menu.
   await board.getByRole('checkbox', { name: 'Library' }).click({ force: true });

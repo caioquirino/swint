@@ -59,6 +59,9 @@
     },
     {
       "path": "./libs/web/feature-session-room"
+    },
+    {
+      "path": "./apps/web-e2e"
     }
   ]
 }

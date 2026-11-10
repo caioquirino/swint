@@ -37,6 +37,18 @@ export const DEFAULT_MESSAGE_RATE = { ratePerSec: 200, burst: 1000 } as const;
 export const UNAUTHENTICATED_CLOSE = { code: 1008, reason: 'unauthenticated' } as const;
 export const RATE_LIMITED_CLOSE = { code: 1008, reason: 'rate_limited' } as const;
 
+/** Upper bound on one identity resolution (upgrade or revalidation). */
+export const RESOLVE_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`identity resolution timed out after ${ms} ms`)), ms);
+    timer.unref();
+  });
+  return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
+}
+
 /** Parses a request target defensively; `null` when it is not a valid URL. */
 function parseTarget(rawUrl: string | undefined): URL | null {
   try {
@@ -116,7 +128,7 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
     const upgrade = async () => {
       let identity: Identity | null = null;
       try {
-        identity = await resolveIdentity(req.headers.cookie);
+        identity = await withTimeout(resolveIdentity(req.headers.cookie), RESOLVE_TIMEOUT_MS);
       } catch (err) {
         logger.warn({ err }, 'collab upgrade: identity resolution failed');
       }
@@ -183,6 +195,7 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
   pingTimer.unref();
 
   // Revalidation: sign-out, auth-session expiry and role removal must reach sockets opened before them.
+  const revalidateMs = opts.revalidateIntervalMs ?? DEFAULT_REVALIDATE_INTERVAL_MS;
   let revalidating = false;
   const revalidateTimer = setInterval(() => {
     if (revalidating) return;
@@ -191,7 +204,7 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
       [...live].map(async ([ws, state]) => {
         let fresh: Identity | null;
         try {
-          fresh = await resolveIdentity(state.cookie);
+          fresh = await withTimeout(resolveIdentity(state.cookie), Math.min(RESOLVE_TIMEOUT_MS, revalidateMs));
         } catch (err) {
           logger.warn({ err }, 'collab: revalidation failed; keeping the socket');
           return;
@@ -204,7 +217,7 @@ export function attachUpgradeHandler(httpServer: Server, opts: UpgradeHandlerOpt
     ).finally(() => {
       revalidating = false;
     });
-  }, opts.revalidateIntervalMs ?? DEFAULT_REVALIDATE_INTERVAL_MS);
+  }, revalidateMs);
   revalidateTimer.unref();
 
   httpServer.on('upgrade', onUpgrade);

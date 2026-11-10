@@ -94,6 +94,7 @@ export async function createApp(
   const { raw, doc } = createDynamo(aws);
   const s3 = createS3(aws);
   let server: FastifyInstance | undefined;
+  let collabServer: CollabServer | undefined;
   try {
     if (config.ensureInfra) {
       await ensureTable(raw, config.tableName);
@@ -178,6 +179,7 @@ export async function createApp(
       allowedOrigins: [new URL(config.publicBaseUrl).origin],
       revalidateIntervalMs: config.collabRevalidateMs,
     });
+    collabServer = collab;
     eventsTarget.current = composeEvents(server.log, collab.events, overrides.events);
     // The upgrade listener must exist before listen().
     collab.attach(server.server);
@@ -207,6 +209,7 @@ export async function createApp(
     };
   } catch (err) {
     // Startup failed (e.g. DynamoDB unreachable during ensureTable): release what was opened, then rethrow.
+    await collabServer?.close().catch(() => undefined);
     await server?.close().catch(() => undefined);
     raw.destroy();
     s3.destroy();

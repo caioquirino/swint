@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { useEffect } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import * as Y from 'yjs';
 import { getBoardElements } from '@swint/shared-collab-protocol';
@@ -24,7 +25,10 @@ vi.mock('@excalidraw/excalidraw', () => ({
   serializeAsJSON: vi.fn(() => '{"type":"excalidraw"}'),
   Excalidraw: (props: Record<string, unknown>) => {
     lastProps = props;
-    (props['excalidrawAPI'] as (a: unknown) => void)?.(api);
+    useEffect(() => {
+      (props['excalidrawAPI'] as ((a: unknown) => void) | undefined)?.(api);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     return <div data-testid="excalidraw" data-view-mode={String(props['viewModeEnabled'])} />;
   },
 }));

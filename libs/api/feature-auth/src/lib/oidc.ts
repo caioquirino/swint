@@ -33,11 +33,15 @@ export interface OidcSettings {
 /** A customFetch that sends requests for the issuer's public origin to `internalUrl`'s origin instead. */
 export function backchannelFetch(issuer: string, internalUrl: string, fetchImpl: typeof fetch = (u, i) => fetch(u, i)): client.CustomFetch {
   const from = new URL(issuer).origin;
-  const to = new URL(internalUrl).origin;
+  const toUrl = new URL(internalUrl);
   return (url, options) => {
     const target = new URL(url);
-    const href = target.origin === from ? new URL(target.pathname + target.search, to).href : url;
-    return fetchImpl(href, options as RequestInit);
+    // Swap protocol and host only, so no path (e.g. `//evil.example/x`) can change the destination.
+    if (target.origin === from) {
+      target.protocol = toUrl.protocol;
+      target.host = toUrl.host;
+    }
+    return fetchImpl(target.href, options as RequestInit);
   };
 }
 

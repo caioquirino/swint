@@ -217,4 +217,24 @@ describe('socket policy', () => {
     await expect(closed).resolves.toEqual({ code: 1008, reason: 'unauthenticated' });
     await s.close();
   });
+
+  it('keeps revalidating other sockets after one resolution never settles', async () => {
+    const s = await startWith({ revalidateIntervalMs: 50 });
+    let hang = false;
+    resolver = async (c) => {
+      if (hang && c === 'hang') return new Promise<never>(() => undefined);
+      return c === 'ada' || c === 'hang' ? ada : null;
+    };
+    const a = new WebSocket(s.url, { headers: { cookie: 'hang' } });
+    const b = new WebSocket(s.url, { headers: { cookie: 'ada' } });
+    expect(await Promise.all([outcome(a), outcome(b)])).toEqual([101, 101]);
+    hang = true;
+    await sleep(120); // a's revalidation is now stuck
+    const closed = closedWith(b);
+    resolver = async (c) => (c === 'hang' ? new Promise<never>(() => undefined) : null);
+    await expect(closed).resolves.toEqual({ code: 1008, reason: 'unauthenticated' });
+    expect(a.readyState).toBe(WebSocket.OPEN); // timed out: kept, like any resolution error
+    a.terminate();
+    await s.close();
+  });
 });

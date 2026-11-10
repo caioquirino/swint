@@ -22,6 +22,16 @@ describe('backchannelFetch', () => {
     await f('https://elsewhere.test/jwks', { method: 'GET', headers: {} } as never);
     expect(seen).toEqual(['http://keycloak:8080/realms/swint/protocol/openid-connect/token?x=1', 'https://elsewhere.test/jwks']);
   });
+
+  it('keeps a //-prefixed path on the internal host', async () => {
+    const seen: string[] = [];
+    const f = backchannelFetch('http://localhost:8080/realms/swint', 'http://keycloak:8080', async (u) => {
+      seen.push(String(u));
+      return new Response('{}');
+    });
+    await f('http://localhost:8080//evil.example/x?y=1', { method: 'GET', headers: {} } as never);
+    expect(seen).toEqual(['http://keycloak:8080//evil.example/x?y=1']);
+  });
 });
 
 describe('createOidcClient with internalUrl', () => {

@@ -18,7 +18,7 @@ export const excalidrawFns: ExcalidrawFns = {
   restoreElements: (elements) =>
     restoreElements(elements as never, null, { refreshDimensions: false, repairBindings: false }) as unknown as readonly SyncedElement[],
   refreshTextDimensions: (elements) =>
-    restoreElements(elements as never, null, { refreshDimensions: true, repairBindings: false }) as unknown as readonly SyncedElement[],
+    restoreElements(elements as never, null, { refreshDimensions: true, repairBindings: true }) as unknown as readonly SyncedElement[],
   captureNever: CaptureUpdateAction.NEVER,
 };
 
