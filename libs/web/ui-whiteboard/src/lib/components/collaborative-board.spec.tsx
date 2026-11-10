@@ -137,7 +137,7 @@ describe('CollaborativeBoard', () => {
       saveToActiveFile: false,
       toggleTheme: null,
     };
-    const press = (init: KeyboardEventInit, target: EventTarget = document) => {
+    const press = (init: KeyboardEventInit, target: EventTarget = document.body) => {
       const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
       target.dispatchEvent(event);
       return event;
@@ -162,6 +162,12 @@ describe('CollaborativeBoard', () => {
       // Meta works as the modifier, and unrelated keys pass through.
       expect(press({ key: 'o', metaKey: true }).defaultPrevented).toBe(true);
       expect(press({ key: 'o' }).defaultPrevented).toBe(false);
+      // Targets inside the board are blocked too.
+      expect(press({ key: 'f', ctrlKey: true }, screen.getByTestId('excalidraw')).defaultPrevented).toBe(true);
+      // Outside the board (a sibling panel) the browser keeps its keys.
+      const outside = document.body.appendChild(document.createElement('button'));
+      for (const init of shortcuts) expect(press(init, outside).defaultPrevented).toBe(false);
+      outside.remove();
       // Editable targets are left alone.
       for (const tag of ['input', 'textarea']) {
         const el = document.body.appendChild(document.createElement(tag));
@@ -169,9 +175,15 @@ describe('CollaborativeBoard', () => {
         el.remove();
       }
       const editable = document.body.appendChild(document.createElement('div'));
-      editable.setAttribute('contenteditable', 'true');
-      expect(press({ key: 'f', ctrlKey: true }, editable).defaultPrevented).toBe(false);
+      for (const value of ['true', '', 'plaintext-only']) {
+        editable.setAttribute('contenteditable', value);
+        expect(press({ key: 'f', ctrlKey: true }, editable).defaultPrevented).toBe(false);
+      }
       editable.remove();
+      // Inside the board, an editable child (e.g. Excalidraw's text editor) is left alone too.
+      const inner = screen.getByTestId('excalidraw').appendChild(document.createElement('textarea'));
+      expect(press({ key: 'f', ctrlKey: true }, inner).defaultPrevented).toBe(false);
+      inner.remove();
       unmount();
       for (const init of shortcuts) expect(press(init).defaultPrevented).toBe(false);
     });

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type RefObject } from 'react';
 import { MainMenu } from '@excalidraw/excalidraw';
 
 export type BoardMenuKind = 'none' | 'export';
@@ -38,17 +38,21 @@ const isBlockedShortcut = (event: KeyboardEvent): boolean => {
 };
 
 const isEditable = (target: EventTarget | null): boolean =>
-  target instanceof Element && target.closest('input, textarea, [contenteditable=""], [contenteditable="true"]') !== null;
+  target instanceof Element && target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])') !== null;
 
-export function useBlockedShortcuts(enabled: boolean): void {
+/** Only keys aimed at the board (or at body, where Excalidraw's canvas often leaves focus) are blocked. */
+const isBoardTarget = (target: EventTarget | null, board: HTMLElement | null): boolean =>
+  target === document.body || (target instanceof Node && board !== null && board.contains(target));
+
+export function useBlockedShortcuts(enabled: boolean, boardRef: RefObject<HTMLElement | null>): void {
   useEffect(() => {
     if (!enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isEditable(event.target) || !isBlockedShortcut(event)) return;
+      if (!isBoardTarget(event.target, boardRef.current) || isEditable(event.target) || !isBlockedShortcut(event)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
     };
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [enabled]);
+  }, [enabled, boardRef]);
 }
