@@ -36,7 +36,8 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
   const collapseRef = useRef<HTMLButtonElement>(null);
   const expandRef = useRef<HTMLButtonElement>(null);
-  const firstRender = useRef(true);
+  // Previous collapsed value: focus moves only on a real change (StrictMode re-runs mount effects in dev).
+  const prevCollapsed = useRef(layout.collapsed);
   const onChangeRef = useRef(onLayoutChange);
   onChangeRef.current = onLayoutChange;
 
@@ -47,10 +48,8 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
 
   // Collapsing hides the focused button and expanding unmounts the rail: hand focus to the counterpart.
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
+    if (prevCollapsed.current === layout.collapsed) return;
+    prevCollapsed.current = layout.collapsed;
     (layout.collapsed ? expandRef : collapseRef).current?.focus();
   }, [layout.collapsed]);
 
