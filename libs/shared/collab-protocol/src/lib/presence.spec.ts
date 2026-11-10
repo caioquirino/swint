@@ -53,6 +53,21 @@ describe('stampAwarenessState', () => {
     expect(bad[AWARENESS_USER_FIELD]).not.toHaveProperty('pointer');
     expect((bad[AWARENESS_USER_FIELD] as { selectedElementIds: object }).selectedElementIds).toEqual({});
   });
+  it('keeps a valid follow target and viewport, drops invalid ones', () => {
+    const viewport = { x1: -10, y1: 0, x2: 800.5, y2: 600 };
+    const ok = stampAwarenessState({ [AWARENESS_USER_FIELD]: { following: '1234567', viewport } }, who);
+    expect(ok[AWARENESS_USER_FIELD]).toMatchObject({ following: '1234567', viewport });
+    for (const following of ['abc', '', '1'.repeat(17), 42]) {
+      expect(stampAwarenessState({ [AWARENESS_USER_FIELD]: { following } }, who)[AWARENESS_USER_FIELD]).not.toHaveProperty('following');
+    }
+    for (const bad of [
+      { x1: 0, y1: 0, x2: 1 },
+      { x1: 'a', y1: 0, x2: 1, y2: 1 },
+      { x1: Infinity, y1: 0, x2: 1, y2: 1 },
+    ]) {
+      expect(stampAwarenessState({ [AWARENESS_USER_FIELD]: { viewport: bad } }, who)[AWARENESS_USER_FIELD]).not.toHaveProperty('viewport');
+    }
+  });
   it('drops oversized selections', () => {
     const huge = Object.fromEntries(Array.from({ length: 1001 }, (_, i) => [`e${i}`, true]));
     const out = stampAwarenessState({ [AWARENESS_USER_FIELD]: { selectedElementIds: huge } }, who);

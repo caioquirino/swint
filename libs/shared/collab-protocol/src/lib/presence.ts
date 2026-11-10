@@ -28,10 +28,12 @@ export interface PresenceIdentity {
 
 const pointerSchema = awarenessUserSchema.shape.pointer;
 const selectionSchema = awarenessUserSchema.shape.selectedElementIds;
+const followingSchema = awarenessUserSchema.shape.following;
+const viewportSchema = awarenessUserSchema.shape.viewport;
 
 /**
  * Rewrites the awareness `user` field so identity comes from the server, not the client.
- * Keeps a valid pointer and selection, drops every other client-claimed user key, and leaves
+ * Keeps a valid pointer, selection, follow target and viewport, drops every other client-claimed user key, and leaves
  * other top-level fields (e.g. TipTap's `cursor`) untouched.
  */
 export function stampAwarenessState(state: Record<string, unknown>, who: PresenceIdentity): Record<string, unknown> {
@@ -39,6 +41,8 @@ export function stampAwarenessState(state: Record<string, unknown>, who: Presenc
   const claimed = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
   const pointer = pointerSchema.safeParse(claimed['pointer']);
   const selection = selectionSchema.safeParse(claimed['selectedElementIds']);
+  const following = followingSchema.safeParse(claimed['following']);
+  const viewport = viewportSchema.safeParse(claimed['viewport']);
   const selectedElementIds = selection.success && Object.keys(selection.data).length <= MAX_SELECTED ? selection.data : {};
   const user: AwarenessUser = {
     userId: who.userId,
@@ -47,6 +51,8 @@ export function stampAwarenessState(state: Record<string, unknown>, who: Presenc
     color: colorForUser(who.userId),
     selectedElementIds,
     ...(pointer.success && pointer.data ? { pointer: pointer.data } : {}),
+    ...(following.success && following.data ? { following: following.data } : {}),
+    ...(viewport.success && viewport.data ? { viewport: viewport.data } : {}),
   };
   return { ...state, [AWARENESS_USER_FIELD]: user };
 }

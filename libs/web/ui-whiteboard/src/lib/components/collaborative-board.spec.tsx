@@ -12,6 +12,12 @@ const api = {
   getFiles: vi.fn(() => ({})),
   updateLibrary: vi.fn(),
   refresh: vi.fn(),
+  unfollow: vi.fn(),
+  followListener: null as ((event: unknown) => void) | null,
+  onUserFollow: vi.fn((cb: (event: unknown) => void) => {
+    api.followListener = cb;
+    return api.unfollow;
+  }),
 };
 let lastProps: Record<string, unknown> = {};
 let lastMenuChildren: unknown;
@@ -103,6 +109,18 @@ describe('CollaborativeBoard', () => {
     expect(svg.type).toBe('image/svg+xml');
     const json = await handle.exportAs('excalidraw');
     expect(await readText(json)).toContain('excalidraw');
+  });
+
+  it("subscribes to Excalidraw's follow emitter (the prop is never called) and publishes whom it follows", async () => {
+    const { Awareness } = await import('y-protocols/awareness');
+    const doc = new Y.Doc();
+    const awareness = new Awareness(doc);
+    const { unmount } = render(<CollaborativeBoard doc={doc} awareness={awareness} readOnly={false} menu="export" />);
+    await act(async () => undefined);
+    act(() => api.followListener?.({ userToFollow: { socketId: '42', username: 'Bo' }, action: 'FOLLOW' }));
+    expect(awareness.getLocalState()?.['user']).toMatchObject({ following: '42' });
+    unmount();
+    expect(api.unfollow).toHaveBeenCalled();
   });
 
   it('exposes the number of visible elements for end-to-end tests', () => {

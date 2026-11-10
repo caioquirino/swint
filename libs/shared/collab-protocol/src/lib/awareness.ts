@@ -12,6 +12,13 @@ export const awarenessUserSchema = z.object({
     .object({ x: z.number(), y: z.number(), tool: z.enum(['pointer', 'laser']), button: z.enum(['up', 'down']).optional() })
     .optional(),
   selectedElementIds: z.record(z.string(), z.literal(true)),
+  /** Excalidraw socket id (the awareness client id) of the user this client follows. */
+  following: z
+    .string()
+    .regex(/^\d{1,16}$/)
+    .optional(),
+  /** Visible scene bounds, published only while someone follows this client. */
+  viewport: z.object({ x1: z.number(), y1: z.number(), x2: z.number(), y2: z.number() }).optional(),
 });
 
 export type AwarenessUser = z.infer<typeof awarenessUserSchema>;

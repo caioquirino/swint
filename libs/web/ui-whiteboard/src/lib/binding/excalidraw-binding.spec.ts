@@ -35,6 +35,9 @@ const fns: ExcalidrawFns = {
   },
   restoreElements: (els) => els,
   refreshTextDimensions: (els) => els,
+  // Test appStates carry their bounds directly; fitting scrolls to the bounds' corner.
+  visibleBounds: (appState) => (appState as { bounds: [number, number, number, number] }).bounds,
+  fitBounds: ([x1, y1]) => ({ scrollX: -x1, scrollY: -y1, zoom: { value: 1 } }),
   captureNever: 'NEVER',
 };
 
@@ -69,15 +72,17 @@ function fakeScheduler() {
   };
 }
 
-function fakeApi(): SceneApi & { updateScene: ReturnType<typeof vi.fn> } {
+function fakeApi(): SceneApi & { updateScene: ReturnType<typeof vi.fn>; appState: Record<string, unknown> } {
   let scene: readonly SyncedElement[] = [];
-  return {
+  const api = {
+    appState: {} as Record<string, unknown>,
     updateScene: vi.fn((s: { elements?: readonly SyncedElement[] }) => {
       if (s.elements) scene = s.elements;
     }),
     getSceneElementsIncludingDeleted: () => scene,
-    getAppState: () => ({}),
+    getAppState: () => api.appState,
   };
+  return api;
 }
 
 function setup() {
@@ -280,6 +285,94 @@ describe('ExcalidrawBinding', () => {
     sched.frame();
     flush();
     expect(apiA.updateScene).not.toHaveBeenCalled();
+  });
+});
+
+describe('follow', () => {
+  const user = (extra: Record<string, unknown> = {}) => ({
+    userId: 'candidate:s1',
+    name: 'Bo',
+    role: 'candidate',
+    color: '#2f9e44',
+    selectedElementIds: {},
+    ...extra,
+  });
+  /** A remote peer whose awareness updates reach A. */
+  function remotePeer(awA: Awareness) {
+    const peer = new Awareness(new Y.Doc());
+    return {
+      id: String(peer.clientID),
+      set(extra: Record<string, unknown>) {
+        peer.setLocalStateField(AWARENESS_USER_FIELD, user(extra));
+        applyAwarenessUpdate(awA, encodeAwarenessUpdate(peer, [peer.clientID]), 'remote');
+      },
+    };
+  }
+  /** A test appState showing these scene bounds (see the fake `visibleBounds`). */
+  const showing = (...bounds: [number, number, number, number]) => ({ selectedElementIds: {}, bounds });
+  const mine = (awA: Awareness) => awA.getLocalState()?.[AWARENESS_USER_FIELD] as Record<string, unknown> | undefined;
+
+  it('publishes whom it follows, and clears it on unfollow', () => {
+    const { awA, bindA } = setup();
+    bindA.handleFollow({ userToFollow: { socketId: '42', username: 'Bo' }, action: 'FOLLOW' });
+    expect(mine(awA)?.['following']).toBe('42');
+    bindA.handleFollow({ userToFollow: { socketId: '42', username: 'Bo' }, action: 'UNFOLLOW' });
+    expect(mine(awA)?.['following']).toBeUndefined();
+  });
+
+  it('publishes its viewport only while followed, throttled and only when it changes', () => {
+    const { awA, apiA, bindA, sched } = setup();
+    const peer = remotePeer(awA);
+    apiA.appState = showing(0, 0, 100, 100);
+    bindA.handleChange([], apiA.appState);
+    expect(mine(awA)?.['viewport']).toBeUndefined();
+    // A follower appears: the current viewport goes out right away.
+    peer.set({ following: String(awA.clientID) });
+    expect(mine(awA)?.['viewport']).toEqual({ x1: 0, y1: 0, x2: 100, y2: 100 });
+    const set = vi.spyOn(awA, 'setLocalStateField');
+    sched.advance(POINTER_INTERVAL_MS);
+    bindA.handleChange([], showing(10, 0, 110, 100)); // leading
+    bindA.handleChange([], showing(20, 0, 120, 100)); // throttled
+    bindA.handleChange([], showing(30, 0, 130, 100)); // throttled, latest wins
+    expect(set).toHaveBeenCalledTimes(1);
+    sched.advance(POINTER_INTERVAL_MS);
+    expect(set).toHaveBeenCalledTimes(2);
+    expect(mine(awA)?.['viewport']).toEqual({ x1: 30, y1: 0, x2: 130, y2: 100 });
+    sched.advance(POINTER_INTERVAL_MS);
+    bindA.handleChange([], showing(30, 0, 130, 100)); // unchanged: nothing sent
+    expect(set).toHaveBeenCalledTimes(2);
+    // Read-only boards can still be followed.
+    bindA.setReadOnly(true);
+    bindA.handleChange([], showing(40, 0, 140, 100));
+    expect(mine(awA)?.['viewport']).toEqual({ x1: 40, y1: 0, x2: 140, y2: 100 });
+    // The follower leaves: the viewport is withdrawn and no longer published.
+    peer.set({ following: '777' });
+    expect(mine(awA)?.['viewport']).toBeUndefined();
+    sched.advance(POINTER_INTERVAL_MS);
+    bindA.handleChange([], showing(50, 0, 150, 100));
+    expect(mine(awA)?.['viewport']).toBeUndefined();
+  });
+
+  it('moves its own view to the followed peer viewport, once per change', () => {
+    const { awA, apiA, bindA } = setup();
+    const followed = remotePeer(awA);
+    const other = remotePeer(awA);
+    const scrolls = () => apiA.updateScene.mock.calls.map((c) => c[0]).filter((u) => u.appState);
+    followed.set({ viewport: { x1: 5, y1: 6, x2: 105, y2: 106 } });
+    expect(scrolls()).toHaveLength(0); // not following yet
+    // Start following: the known viewport applies right away.
+    apiA.appState = { userToFollow: { socketId: followed.id, username: 'Bo' } };
+    bindA.handleFollow({ userToFollow: { socketId: followed.id, username: 'Bo' }, action: 'FOLLOW' });
+    expect(scrolls()).toEqual([{ appState: { scrollX: -5, scrollY: -6, zoom: { value: 1 } }, captureUpdate: 'NEVER' }]);
+    followed.set({ viewport: { x1: 5, y1: 6, x2: 105, y2: 106 }, selectedElementIds: { r: true } }); // same viewport
+    other.set({ viewport: { x1: 900, y1: 900, x2: 1000, y2: 1000 } }); // someone else's
+    expect(scrolls()).toHaveLength(1);
+    followed.set({ viewport: { x1: 50, y1: 60, x2: 150, y2: 160 } });
+    expect(scrolls().at(-1)).toEqual({ appState: { scrollX: -50, scrollY: -60, zoom: { value: 1 } }, captureUpdate: 'NEVER' });
+    // Unfollowed (Excalidraw clears userToFollow): further moves are ignored.
+    apiA.appState = { userToFollow: null };
+    followed.set({ viewport: { x1: 70, y1: 80, x2: 170, y2: 180 } });
+    expect(scrolls()).toHaveLength(2);
   });
 });
 

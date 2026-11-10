@@ -25,16 +25,37 @@ export interface SceneCollaborator {
 
 /** The subset of ExcalidrawImperativeAPI the binding uses (structural, so tests can fake it). */
 export interface SceneApi {
-  updateScene(scene: { elements?: readonly SyncedElement[]; collaborators?: Map<string, SceneCollaborator>; captureUpdate?: string }): void;
+  updateScene(scene: {
+    elements?: readonly SyncedElement[];
+    collaborators?: Map<string, SceneCollaborator>;
+    appState?: ViewTransform;
+    captureUpdate?: string;
+  }): void;
   getSceneElementsIncludingDeleted(): readonly SyncedElement[];
   getAppState(): unknown;
-  /** Excalidraw's toast; optional so fakes can omit it. */
   /** Replaces the Excalidraw library; optional so fakes can omit it. */
   updateLibrary?(opts: { libraryItems: unknown; merge: boolean }): unknown;
+  /** Excalidraw's toast; optional so fakes can omit it. */
   setToast?(toast: { message: string } | null): void;
 }
 
 export const UNSUPPORTED_ELEMENT_MESSAGE = 'Images and embeds are not supported on the shared board.';
+
+/** Scene bounds [x1, y1, x2, y2]. */
+export type SceneBounds = readonly [number, number, number, number];
+
+/** The scroll and zoom that place a viewport. */
+export interface ViewTransform {
+  scrollX: number;
+  scrollY: number;
+  zoom: { value: number };
+}
+
+/** Excalidraw's `onUserFollow` payload (the socket id is the awareness client id, our collaborator key). */
+export interface FollowEvent {
+  userToFollow: { socketId: string; username: string };
+  action: 'FOLLOW' | 'UNFOLLOW';
+}
 
 /** Excalidraw functions, injected so the binding is testable without the Excalidraw bundle. */
 export interface ExcalidrawFns {
@@ -42,6 +63,10 @@ export interface ExcalidrawFns {
   restoreElements(elements: readonly SyncedElement[]): readonly SyncedElement[];
   /** Re-measures text elements (font changes alter metrics). */
   refreshTextDimensions(elements: readonly SyncedElement[]): readonly SyncedElement[];
+  /** The scene area an appState shows. */
+  visibleBounds(appState: unknown): SceneBounds;
+  /** Scroll and zoom that fit `bounds` into this appState's canvas. */
+  fitBounds(bounds: SceneBounds, appState: unknown): ViewTransform;
   /** CaptureUpdateAction.NEVER: remote updates must never enter the local undo stack. */
   captureNever: string;
 }
@@ -63,6 +88,7 @@ const browserScheduler: Scheduler = {
 };
 
 type Pointer = NonNullable<AwarenessUser['pointer']>;
+type Viewport = NonNullable<AwarenessUser['viewport']>;
 type AwarenessChanges = { added: number[]; updated: number[]; removed: number[] };
 
 export interface ExcalidrawBindingOptions {
@@ -84,6 +110,14 @@ export class ExcalidrawBinding {
   private lastPointerAt = Number.NEGATIVE_INFINITY;
   private pointerTimer: number | null = null;
   private lastSentButton: 'up' | 'down' | undefined;
+  /** Someone follows this client: publish the viewport. */
+  private followed = false;
+  private pendingViewport: Viewport | null = null;
+  private lastViewportKey = '';
+  private lastViewportAt = Number.NEGATIVE_INFINITY;
+  private viewportTimer: number | null = null;
+  /** The followed peer's viewport last applied here. */
+  private appliedViewportKey = '';
   private readOnly = false;
   private destroyed = false;
 
@@ -101,10 +135,11 @@ export class ExcalidrawBinding {
     if (readOnly) this.pendingScene = null;
   }
 
-  /** Excalidraw `onChange`. At most one BoardSync push per animation frame, with the latest scene. */
+  /** Excalidraw `onChange`. At most one BoardSync push per animation frame, with the latest scene. The appState also gives the viewport. */
   handleChange(elements: readonly SyncedElement[], appState: { selectedElementIds?: Record<string, boolean> }): void {
     if (this.destroyed) return;
     this.publishSelection(appState.selectedElementIds ?? {});
+    this.publishViewport(appState);
     if (this.readOnly) return;
     this.pendingScene = elements;
     if (this.frame === null) this.frame = this.s.requestFrame(this.flush);
@@ -132,11 +167,24 @@ export class ExcalidrawBinding {
     }
   }
 
+  /** Excalidraw `onUserFollow`: announce whom this client follows, so that peer starts publishing its viewport. */
+  handleFollow({ userToFollow, action }: FollowEvent): void {
+    if (this.destroyed) return;
+    if (action === 'UNFOLLOW') {
+      this.patchUser({ following: undefined });
+      return;
+    }
+    this.patchUser({ following: userToFollow.socketId });
+    this.appliedViewportKey = '';
+    this.followViewport();
+  }
+
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
     if (this.frame !== null) this.s.cancelFrame(this.frame);
     if (this.pointerTimer !== null) this.s.clearTimeout(this.pointerTimer);
+    if (this.viewportTimer !== null) this.s.clearTimeout(this.viewportTimer);
     this.o.awareness?.off('change', this.handleAwareness);
     this.sync.destroy();
   }
@@ -173,6 +221,66 @@ export class ExcalidrawBinding {
     this.pendingPointer = null;
   }
 
+  /** Leading + trailing throttle, like the pointer; only while followed and only on change. */
+  private publishViewport(appState: unknown, immediate = false): void {
+    if (!this.followed || !this.o.awareness) return;
+    const [x1, y1, x2, y2] = this.o.fns.visibleBounds(appState);
+    const key = `${x1},${y1},${x2},${y2}`;
+    if (key === this.lastViewportKey) return;
+    this.lastViewportKey = key;
+    this.pendingViewport = { x1, y1, x2, y2 };
+    const elapsed = this.s.now() - this.lastViewportAt;
+    if (immediate || elapsed >= POINTER_INTERVAL_MS) {
+      if (this.viewportTimer !== null) this.s.clearTimeout(this.viewportTimer);
+      this.viewportTimer = null;
+      this.sendViewport();
+    } else if (this.viewportTimer === null) {
+      this.viewportTimer = this.s.setTimeout(() => {
+        this.viewportTimer = null;
+        this.sendViewport();
+      }, POINTER_INTERVAL_MS - elapsed);
+    }
+  }
+
+  private sendViewport(): void {
+    if (!this.pendingViewport || !this.followed) return;
+    this.lastViewportAt = this.s.now();
+    this.patchUser({ viewport: this.pendingViewport });
+    this.pendingViewport = null;
+  }
+
+  private setFollowed(followed: boolean): void {
+    if (followed === this.followed) return;
+    this.followed = followed;
+    this.lastViewportKey = '';
+    if (followed) {
+      // A new follower needs the current view now, not on the next scroll.
+      this.publishViewport(this.o.api.getAppState(), true);
+      return;
+    }
+    if (this.viewportTimer !== null) this.s.clearTimeout(this.viewportTimer);
+    this.viewportTimer = null;
+    this.pendingViewport = null;
+    this.patchUser({ viewport: undefined });
+  }
+
+  /** Moves this view onto the followed peer's viewport when it changed. */
+  private followViewport(): void {
+    const awareness = this.o.awareness;
+    if (!awareness) return;
+    const appState = this.o.api.getAppState();
+    const target = (appState as { userToFollow?: { socketId?: string } | null } | null)?.userToFollow?.socketId;
+    if (!target) return;
+    const state = awareness.getStates().get(Number(target));
+    const viewport = state ? readAwarenessUser(state)?.viewport : undefined;
+    if (!viewport) return;
+    const key = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+    if (key === this.appliedViewportKey) return;
+    this.appliedViewportKey = key;
+    const appStatePatch = this.o.fns.fitBounds([viewport.x1, viewport.y1, viewport.x2, viewport.y2], appState);
+    this.o.api.updateScene({ appState: appStatePatch, captureUpdate: this.o.fns.captureNever });
+  }
+
   private publishSelection(selected: Record<string, boolean>): void {
     const ids = Object.keys(selected)
       .filter((id) => selected[id])
@@ -196,10 +304,13 @@ export class ExcalidrawBinding {
     if (!awareness || this.destroyed) return;
     if (changes && [...changes.added, ...changes.updated, ...changes.removed].every((id) => id === awareness.clientID)) return;
     const collaborators = new Map<string, SceneCollaborator>();
+    const me = String(awareness.clientID);
+    let followed = false;
     awareness.getStates().forEach((state, clientId) => {
       if (clientId === awareness.clientID) return;
       const user = readAwarenessUser(state);
       if (!user) return;
+      if (user.following === me) followed = true;
       collaborators.set(String(clientId), {
         id: user.userId,
         username: user.name,
@@ -210,5 +321,7 @@ export class ExcalidrawBinding {
       });
     });
     this.o.api.updateScene({ collaborators, captureUpdate: this.o.fns.captureNever });
+    this.setFollowed(followed);
+    this.followViewport();
   };
 }

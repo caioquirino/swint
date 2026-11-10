@@ -36,7 +36,11 @@ export function normalizeStyle(element: SyncedElement): SyncedElement {
  * result back to Excalidraw without an undo entry, and returns it; otherwise returns `scene` unchanged.
  * Pasted content, old templates and other clients' defaults all pass through here.
  */
-export function enforceBoardStyle(scene: readonly SyncedElement[], api: SceneApi, fns: ExcalidrawFns): readonly SyncedElement[] {
+export function enforceBoardStyle(
+  scene: readonly SyncedElement[],
+  api: SceneApi,
+  fns: Pick<ExcalidrawFns, 'refreshTextDimensions' | 'captureNever'>,
+): readonly SyncedElement[] {
   const normalized = scene.map(normalizeStyle);
   const changed = normalized.filter((e, i) => e !== scene[i]);
   if (changed.length === 0) return scene;

@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import type { Awareness } from 'y-protocols/awareness';
-import { CaptureUpdateAction, Excalidraw, reconcileElements, restoreElements } from '@excalidraw/excalidraw';
+import {
+  CaptureUpdateAction,
+  Excalidraw,
+  getVisibleSceneBounds,
+  reconcileElements,
+  restoreElements,
+  zoomToFitBounds,
+} from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import '@excalidraw/excalidraw/index.css';
 import type { SyncedElement } from '@swint/shared-collab-protocol';
@@ -20,6 +27,17 @@ export const excalidrawFns: ExcalidrawFns = {
     restoreElements(elements as never, null, { refreshDimensions: false, repairBindings: false }) as unknown as readonly SyncedElement[],
   refreshTextDimensions: (elements) =>
     restoreElements(elements as never, null, { refreshDimensions: true, repairBindings: true }) as unknown as readonly SyncedElement[],
+  visibleBounds: (appState) => getVisibleSceneBounds(appState as never),
+  // As excalidraw.com does for following: fit the followed viewport into ours.
+  fitBounds: (bounds, appState) => {
+    const fitted = zoomToFitBounds({
+      bounds: [...bounds],
+      appState: appState as never,
+      fitToViewport: true,
+      viewportZoomFactor: 1,
+    }).appState;
+    return { scrollX: fitted.scrollX, scrollY: fitted.scrollY, zoom: fitted.zoom };
+  },
   captureNever: CaptureUpdateAction.NEVER,
 };
 
@@ -56,8 +74,11 @@ export function CollaborativeBoard({ doc, awareness, readOnly, menu, theme = 'li
     const binding = new ExcalidrawBinding({ doc, api: api as unknown as SceneApi, awareness, fns: excalidrawFns });
     binding.setReadOnly(readOnlyRef.current);
     bindingRef.current = binding;
+    // The `onUserFollow` prop is declared but never called in Excalidraw 0.18; the API emitter is.
+    const unsubscribeFollow = api.onUserFollow((event) => binding.handleFollow(event));
     onReadyRef.current?.({ exportAs: (format) => exportBoard(api, format), refresh: () => api.refresh() });
     return () => {
+      unsubscribeFollow();
       binding.destroy();
       bindingRef.current = null;
     };
