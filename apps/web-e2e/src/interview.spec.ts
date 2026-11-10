@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { signInAsInterviewer } from './support/auth.js';
 import { drawRectangle } from './support/board.js';
-import { KEYCLOAK_ORIGIN, SEED_ELEMENTS, SEED_RECTANGLES } from './support/env.js';
+import { KEYCLOAK_ORIGIN } from './support/env.js';
 import { createSession, uniqueCandidate } from './support/sessions.js';
 
 const FONT = '/fonts/Excalifont/Excalifont-Regular-349fac6ca4700ffec595a7150a0d1e1d.woff2';
@@ -40,11 +40,28 @@ test('interviewer and candidate run a whole interview', async ({ page, browser, 
   await expect(candidate.getByRole('list', { name: 'Participants' })).toContainText('Interviewer');
 
   // Candidate draws; the interviewer's board receives it live.
-  // The seed template already carries a few elements, so assert relative to that starting scene.
-  await expect(candidate.getByTestId('board')).toHaveAttribute('data-element-count', String(SEED_ELEMENTS));
+  // The template's starting board is the user's data and may change: count relative to what the interviewer's board shows once synced.
+  const elementCount = async (p: Page) => Number(await p.getByTestId('board').getAttribute('data-element-count'));
+  let last = -1;
+  let stableSince = 0;
+  await expect
+    .poll(
+      async () => {
+        const n = await elementCount(page);
+        if (n !== last) {
+          last = n;
+          stableSince = Date.now();
+        }
+        return n > 0 && Date.now() - stableSince >= 1000;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+  const baseline = last;
+  await expect(candidate.getByTestId('board')).toHaveAttribute('data-element-count', String(baseline));
   await drawRectangle(candidate);
-  await expect(candidate.getByTestId('board')).toHaveAttribute('data-element-count', String(SEED_ELEMENTS + 1));
-  await expect(page.getByTestId('board')).toHaveAttribute('data-element-count', String(SEED_ELEMENTS + 1));
+  await expect(candidate.getByTestId('board')).toHaveAttribute('data-element-count', String(baseline + 1));
+  await expect(page.getByTestId('board')).toHaveAttribute('data-element-count', String(baseline + 1));
 
   // Extend by 10 minutes.
   const minutesLeft = async () => Number(/(\d+):\d{2} left/.exec((await page.getByRole('timer').textContent()) ?? '')?.[1] ?? NaN);
@@ -64,7 +81,10 @@ test('interviewer and candidate run a whole interview', async ({ page, browser, 
   await page.getByRole('button', { name: 'Export .excalidraw' }).click();
   const file = await (await download).path();
   const scene = JSON.parse(await readFile(file, 'utf8')) as { elements: { type: string; isDeleted?: boolean }[] };
-  expect(scene.elements.filter((e) => e.type === 'rectangle' && !e.isDeleted)).toHaveLength(SEED_RECTANGLES + 1);
+  // The rectangle baseline is not observable before the draw, so check the total (baseline + 1) and that the newest element is a rectangle.
+  const live = scene.elements.filter((e) => !e.isDeleted);
+  expect(live).toHaveLength(baseline + 1);
+  expect(live.at(-1)?.type).toBe('rectangle');
 
   // Revisit later: read-only room with export, no controls.
   await page.reload();
