@@ -8,10 +8,10 @@ export interface CreatedSession {
 }
 
 /** Creates a session from the dashboard dialog and reads both links from it. */
-export async function createSession(page: Page, candidateName: string): Promise<CreatedSession> {
+export async function createSession(page: Page, candidateName: string, template: string = SEED_TEMPLATE): Promise<CreatedSession> {
   await page.getByRole('button', { name: 'New session' }).click();
   const dialog = page.getByRole('dialog', { name: 'New session' });
-  await dialog.getByLabel('Template').selectOption({ label: SEED_TEMPLATE });
+  await dialog.getByLabel('Template').selectOption({ label: template });
   await dialog.getByLabel('Candidate name').fill(candidateName);
   await dialog.getByRole('button', { name: 'Create session' }).click();
   const candidateUrl = await dialog.getByLabel('Candidate link').inputValue();
