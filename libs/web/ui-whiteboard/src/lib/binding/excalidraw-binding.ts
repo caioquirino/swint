@@ -18,6 +18,8 @@ export interface SceneCollaborator {
   username: string;
   color: { background: string; stroke: string };
   pointer?: { x: number; y: number; tool: 'pointer' | 'laser' };
+  /** Laser trails draw only while a collaborator's button is 'down'. */
+  button?: 'up' | 'down';
   selectedElementIds?: Record<string, true>;
 }
 
@@ -81,6 +83,7 @@ export class ExcalidrawBinding {
   private pendingPointer: Pointer | null = null;
   private lastPointerAt = Number.NEGATIVE_INFINITY;
   private pointerTimer: number | null = null;
+  private lastSentButton: 'up' | 'down' | undefined;
   private readOnly = false;
   private destroyed = false;
 
@@ -108,9 +111,16 @@ export class ExcalidrawBinding {
   }
 
   /** Excalidraw `onPointerUpdate`. Leading + trailing throttle. */
-  handlePointer(pointer: Pointer): void {
+  handlePointer(pointer: Pointer, button?: 'up' | 'down'): void {
     if (this.destroyed || !this.o.awareness) return;
-    this.pendingPointer = { x: pointer.x, y: pointer.y, tool: pointer.tool };
+    this.pendingPointer = { x: pointer.x, y: pointer.y, tool: pointer.tool, ...(button ? { button } : {}) };
+    if (button !== this.lastSentButton) {
+      // A button change must not wait (a laser trail starts/ends on it) and makes any pending trailing send stale.
+      if (this.pointerTimer !== null) this.s.clearTimeout(this.pointerTimer);
+      this.pointerTimer = null;
+      this.sendPointer();
+      return;
+    }
     const elapsed = this.s.now() - this.lastPointerAt;
     if (elapsed >= POINTER_INTERVAL_MS) {
       this.sendPointer();
@@ -158,6 +168,7 @@ export class ExcalidrawBinding {
   private sendPointer(): void {
     if (!this.pendingPointer) return;
     this.lastPointerAt = this.s.now();
+    this.lastSentButton = this.pendingPointer.button;
     this.patchUser({ pointer: this.pendingPointer });
     this.pendingPointer = null;
   }
@@ -193,7 +204,8 @@ export class ExcalidrawBinding {
         id: user.userId,
         username: user.name,
         color: { background: user.color, stroke: user.color },
-        ...(user.pointer ? { pointer: user.pointer } : {}),
+        ...(user.pointer ? { pointer: { x: user.pointer.x, y: user.pointer.y, tool: user.pointer.tool } } : {}),
+        ...(user.pointer?.button ? { button: user.pointer.button } : {}),
         selectedElementIds: user.selectedElementIds,
       });
     });

@@ -165,6 +165,57 @@ describe('ExcalidrawBinding', () => {
     expect(awA.getLocalState()?.[AWARENESS_USER_FIELD]).toMatchObject({ pointer: { x: 3, y: 3, tool: 'pointer' } });
   });
 
+  it('publishes the button and sends a button change immediately, cancelling the pending trailing send', () => {
+    const { awA, sched, bindA } = setup();
+    const set = vi.spyOn(awA, 'setLocalStateField');
+    const pointer = () => (awA.getLocalState()?.[AWARENESS_USER_FIELD] as { pointer?: unknown }).pointer;
+    bindA.handlePointer({ x: 1, y: 1, tool: 'laser' }, 'up');
+    expect(pointer()).toEqual({ x: 1, y: 1, tool: 'laser', button: 'up' });
+    bindA.handlePointer({ x: 2, y: 2, tool: 'laser' }, 'up'); // throttled, trailing pending
+    expect(set).toHaveBeenCalledTimes(1);
+    bindA.handlePointer({ x: 3, y: 3, tool: 'laser' }, 'down'); // immediate
+    expect(set).toHaveBeenCalledTimes(2);
+    expect(pointer()).toEqual({ x: 3, y: 3, tool: 'laser', button: 'down' });
+    sched.advance(POINTER_INTERVAL_MS); // stale trailing send is cancelled
+    expect(set).toHaveBeenCalledTimes(2);
+    bindA.handlePointer({ x: 4, y: 4, tool: 'laser' }, 'down'); // window elapsed: leading send
+    expect(set).toHaveBeenCalledTimes(3);
+    bindA.handlePointer({ x: 4.5, y: 4.5, tool: 'laser' }, 'down'); // same button inside the window: throttled
+    expect(set).toHaveBeenCalledTimes(3);
+    sched.advance(POINTER_INTERVAL_MS);
+    expect(set).toHaveBeenCalledTimes(4);
+    bindA.handlePointer({ x: 5, y: 5, tool: 'laser' }, 'up');
+    expect(set).toHaveBeenCalledTimes(5);
+    expect(pointer()).toEqual({ x: 5, y: 5, tool: 'laser', button: 'up' });
+  });
+
+  it('maps a peer laser button to the collaborator level', () => {
+    const { awA, apiA } = setup();
+    const peer = new Awareness(new Y.Doc());
+    peer.setLocalStateField(AWARENESS_USER_FIELD, {
+      userId: 'candidate:s1',
+      name: 'Bo',
+      role: 'candidate',
+      color: '#2f9e44',
+      selectedElementIds: {},
+      pointer: { x: 4, y: 5, tool: 'laser', button: 'down' },
+    });
+    awA.setLocalStateField(AWARENESS_USER_FIELD, {
+      userId: 'me',
+      name: 'Me',
+      role: 'interviewer',
+      color: '#1971c2',
+      selectedElementIds: {},
+    });
+    const states = new Map(awA.getStates());
+    states.set(99, peer.getLocalState() as never);
+    vi.spyOn(awA, 'getStates').mockReturnValue(states);
+    awA.emit('change', [{ added: [99], updated: [], removed: [] }, 'test']);
+    const last = apiA.updateScene.mock.calls.filter((c) => c[0].collaborators).at(-1)?.[0].collaborators as Map<string, unknown>;
+    expect(last.get('99')).toMatchObject({ button: 'down', pointer: { x: 4, y: 5, tool: 'laser' } });
+    expect((last.get('99') as { pointer: object }).pointer).not.toHaveProperty('button');
+  });
+
   it('publishes selection changes once per change, merged into the existing user field', () => {
     const { awA, bindA } = setup();
     awA.setLocalStateField(AWARENESS_USER_FIELD, {

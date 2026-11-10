@@ -43,6 +43,12 @@ describe('stampAwarenessState', () => {
     );
     expect(ok[AWARENESS_USER_FIELD]).toMatchObject({ pointer: { x: 1, y: 2, tool: 'laser' }, selectedElementIds: { a: true } });
     expect(ok[AWARENESS_USER_FIELD]).not.toHaveProperty('isAdmin');
+    const down = stampAwarenessState({ [AWARENESS_USER_FIELD]: { pointer: { x: 1, y: 2, tool: 'laser', button: 'down' } } }, who);
+    expect(down[AWARENESS_USER_FIELD]).toMatchObject({ pointer: { x: 1, y: 2, tool: 'laser', button: 'down' } });
+    const noButton = stampAwarenessState({ [AWARENESS_USER_FIELD]: { pointer: { x: 1, y: 2, tool: 'pointer' } } }, who);
+    expect(noButton[AWARENESS_USER_FIELD]).toMatchObject({ pointer: { x: 1, y: 2, tool: 'pointer' } });
+    const sideways = stampAwarenessState({ [AWARENESS_USER_FIELD]: { pointer: { x: 1, y: 2, tool: 'laser', button: 'sideways' } } }, who);
+    expect(sideways[AWARENESS_USER_FIELD]).not.toHaveProperty('pointer');
     const bad = stampAwarenessState({ [AWARENESS_USER_FIELD]: { pointer: { x: 'no' }, selectedElementIds: { a: 'yes' } } }, who);
     expect(bad[AWARENESS_USER_FIELD]).not.toHaveProperty('pointer');
     expect((bad[AWARENESS_USER_FIELD] as { selectedElementIds: object }).selectedElementIds).toEqual({});

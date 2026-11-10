@@ -40,6 +40,7 @@ export function backchannelFetch(issuer: string, internalUrl: string, fetchImpl:
     if (target.origin === from) {
       target.protocol = toUrl.protocol;
       target.host = toUrl.host;
+      target.port = toUrl.port;
     }
     return fetchImpl(target.href, options as RequestInit);
   };

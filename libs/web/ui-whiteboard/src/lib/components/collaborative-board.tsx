@@ -90,7 +90,7 @@ export function CollaborativeBoard({ doc, awareness, readOnly, menu, theme = 'li
           if (containerRef.current) containerRef.current.dataset['elementCount'] = String(elements.filter((e) => !e.isDeleted).length);
           bindingRef.current?.handleChange(elements as unknown as readonly SyncedElement[], appState);
         }}
-        onPointerUpdate={({ pointer }) => bindingRef.current?.handlePointer(pointer)}
+        onPointerUpdate={({ pointer, button }) => bindingRef.current?.handlePointer(pointer, button)}
         onPaste={(_data, event) => !hasImageFile(event)}
       >
         <BoardMenu menu={menu} />

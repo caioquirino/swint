@@ -8,7 +8,9 @@ export const awarenessUserSchema = z.object({
   name: z.string().min(1).max(100),
   role: z.enum(PARTICIPANT_ROLES as [ParticipantRole, ...ParticipantRole[]]),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  pointer: z.object({ x: z.number(), y: z.number(), tool: z.enum(['pointer', 'laser']) }).optional(),
+  pointer: z
+    .object({ x: z.number(), y: z.number(), tool: z.enum(['pointer', 'laser']), button: z.enum(['up', 'down']).optional() })
+    .optional(),
   selectedElementIds: z.record(z.string(), z.literal(true)),
 });
 

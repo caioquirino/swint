@@ -34,6 +34,18 @@ describe('backchannelFetch', () => {
   });
 });
 
+describe('backchannelFetch ports', () => {
+  it('drops the public explicit port when the internal URL uses the default port', async () => {
+    const seen: string[] = [];
+    const f = backchannelFetch('http://localhost:8080/realms/swint', 'http://keycloak', async (u) => {
+      seen.push(String(u));
+      return new Response('{}');
+    });
+    await f('http://localhost:8080/realms/swint/certs', { method: 'GET', headers: {} } as never);
+    expect(seen).toEqual(['http://keycloak/realms/swint/certs']);
+  });
+});
+
 describe('createOidcClient with internalUrl', () => {
   it('discovers through the internal URL but sends browsers to the public issuer', async () => {
     const requested: string[] = [];
