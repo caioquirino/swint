@@ -45,3 +45,25 @@ Keycloak through `OIDC_INTERNAL_URL=http://keycloak:8080` while browsers keep us
 Infra ports are bound to 127.0.0.1 only.
 
 If you changed `docker/keycloak/swint-realm.json`, re-import it with `docker compose up -d --force-recreate keycloak`.
+
+## End-to-end tests
+
+Playwright drives two browser contexts (interviewer and candidate) through the real Keycloak login.
+
+```bash
+docker compose up -d                      # infra
+pnpm exec playwright install chromium     # once
+pnpm nx e2e web-e2e                       # starts (or reuses) the dev servers on :4200
+E2E_BASE_URL=http://localhost:8088 pnpm nx e2e web-e2e   # against `docker compose --profile app up`
+```
+
+Reports and traces: `dist/.playwright/apps/web-e2e/`.
+
+## Deployment notes
+
+- Run exactly **one** API replica. Live collaboration documents and session events are held in process memory;
+  scaling out needs sticky routing per session plus the Hocuspocus Redis extension.
+- Required in production: `PUBLIC_BASE_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_SECRET`, `COOKIE_SECRET` (≥ 32 chars).
+  Set `OIDC_INTERNAL_URL` when the API reaches the identity provider on a different origin than browsers do.
+- WebSocket upgrades are accepted only from `PUBLIC_BASE_URL`'s origin. Open sockets are re-checked every
+  `COLLAB_REVALIDATE_MS` (default 60000), so sign-out and role removal reach live rooms.
