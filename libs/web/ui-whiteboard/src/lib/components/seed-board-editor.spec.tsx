@@ -1,12 +1,18 @@
+import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+
+const boardApi = { refresh: vi.fn(), updateLibrary: vi.fn() };
 
 vi.mock('@excalidraw/excalidraw/index.css', () => ({}));
 vi.mock('./collaborative-board.css', () => ({}));
 vi.mock('./collaborative-board.js', () => ({ excalidrawFns: {} }));
 vi.mock('@excalidraw/excalidraw', () => ({
   MainMenu: Object.assign(() => null, { DefaultItems: { Export: () => null, SaveAsImage: () => null } }),
-  Excalidraw: () => <div data-testid="excalidraw" />,
+  Excalidraw: ({ excalidrawAPI }: { excalidrawAPI?: (api: unknown) => void }) => {
+    useEffect(() => excalidrawAPI?.(boardApi), [excalidrawAPI]);
+    return <div data-testid="excalidraw" />;
+  },
 }));
 
 const { SeedBoardEditor } = await import('./seed-board-editor.js');
@@ -33,5 +39,19 @@ describe('SeedBoardEditor', () => {
     };
     expect(press({ key: 'f', ctrlKey: true }).defaultPrevented).toBe(true);
     expect(press({ key: 'o', ctrlKey: true }).defaultPrevented).toBe(false);
+  });
+
+  it('hands out a refresh handle once Excalidraw is ready', async () => {
+    const onReady = vi.fn();
+    render(<SeedBoardEditor initialElements={[]} onChange={() => undefined} onReady={onReady} />);
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+    onReady.mock.calls[0][0].refresh();
+    expect(boardApi.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('fills its container', () => {
+    render(<SeedBoardEditor initialElements={[]} onChange={() => undefined} />);
+    expect(screen.getByTestId('seed-board')).toHaveClass('h-full');
+    expect(screen.getByTestId('seed-board')).not.toHaveClass('h-[420px]');
   });
 });

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import '@excalidraw/excalidraw/index.css';
@@ -11,22 +11,34 @@ import { isSwintLibrary, SWINT_LIBRARY } from '../library/swint-library.js';
 import { BoardMenu, blockFileDrop, boardCanvasActions, useBlockedShortcuts } from './board-menu.js';
 import { excalidrawFns } from './collaborative-board.js';
 
+/** Lets the host re-measure the board after its container was hidden or resized. */
+export interface SeedBoardHandle {
+  refresh(): void;
+}
+
 export interface SeedBoardEditorProps {
   initialElements: readonly SyncedElement[];
   /** Live (non-deleted, non-image) elements after every scene change. */
   onChange: (elements: SyncedElement[]) => void;
   theme?: 'light' | 'dark';
+  /** Called once Excalidraw is ready. */
+  onReady?: (handle: SeedBoardHandle) => void;
 }
 
 /** A local, non-collaborative Excalidraw used to author a template's starting board. */
-export function SeedBoardEditor({ initialElements, onChange, theme = 'light' }: SeedBoardEditorProps) {
+export function SeedBoardEditor({ initialElements, onChange, theme = 'light', onReady }: SeedBoardEditorProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   useBlockedShortcuts('export', containerRef);
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  useEffect(() => {
+    if (api) onReadyRef.current?.({ refresh: () => api.refresh() });
+  }, [api]);
   return (
     <div
       ref={containerRef}
-      className="swint-board h-[420px] w-full overflow-hidden rounded-md border border-slate-300 dark:border-slate-700"
+      className="swint-board h-full min-h-[320px] w-full overflow-hidden rounded-md border border-slate-300 dark:border-slate-700"
       data-testid="seed-board"
       onDragOverCapture={blockFileDrop}
       onDropCapture={blockFileDrop}
