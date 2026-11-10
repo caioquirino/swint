@@ -11,6 +11,7 @@ const api = {
   getAppState: vi.fn(() => ({})),
   getFiles: vi.fn(() => ({})),
   updateLibrary: vi.fn(),
+  refresh: vi.fn(),
 };
 let lastProps: Record<string, unknown> = {};
 let lastMenuChildren: unknown;
@@ -95,6 +96,8 @@ describe('CollaborativeBoard', () => {
     render(<CollaborativeBoard doc={new Y.Doc()} awareness={null} readOnly menu="export" onReady={onReady} />);
     await act(async () => undefined);
     const handle = onReady.mock.calls[0][0];
+    handle.refresh();
+    expect(api.refresh).toHaveBeenCalledOnce();
     await expect(handle.exportAs('png')).resolves.toBeInstanceOf(Blob);
     const svg = await handle.exportAs('svg');
     expect(svg.type).toBe('image/svg+xml');

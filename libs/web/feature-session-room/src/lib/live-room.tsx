@@ -19,6 +19,7 @@ import { CollaborativeBoard, type BoardHandle } from '@swint/web-ui-whiteboard';
 import { bannerState, myPresence } from './connection.js';
 import { ExportMenu } from './export-menu.js';
 import { InterviewEndedScreen, LinkInvalidScreen, RoomUnavailableScreen } from './screens.js';
+import { ResizableAside } from './resizable-aside.js';
 import { SessionControls } from './session-controls.js';
 import { useMergedSessionState } from './session-state.js';
 import { WAITING_POLL_MS } from './use-room.js';
@@ -115,8 +116,8 @@ export function LiveRoom({
       </header>
       <ConnectionBanner state={bannerState(phase, Boolean(snapshot?.conn.everConnected))} />
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-96 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <div role="tablist" className="flex border-b border-slate-200 dark:border-slate-800">
+        <ResizableAside onLayoutChange={() => board?.refresh()}>
+          <div role="tablist" className="flex border-b border-slate-200 pr-12 dark:border-slate-800">
             {tabs.map((t) => (
               <button
                 key={t}
@@ -160,7 +161,7 @@ export function LiveRoom({
               </PanelBoundary>
             ) : null}
           </div>
-        </aside>
+        </ResizableAside>
         <main aria-label="Board" className="relative min-w-0 flex-1">
           {session ? (
             <PanelBoundary title="Board">

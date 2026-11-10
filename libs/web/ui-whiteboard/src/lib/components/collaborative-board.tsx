@@ -25,6 +25,8 @@ export const excalidrawFns: ExcalidrawFns = {
 
 export interface BoardHandle {
   exportAs(format: ExportFormat): Promise<Blob>;
+  /** Re-measures the canvas offsets after its container changed size. */
+  refresh(): void;
 }
 
 export interface CollaborativeBoardProps {
@@ -54,7 +56,7 @@ export function CollaborativeBoard({ doc, awareness, readOnly, menu, theme = 'li
     const binding = new ExcalidrawBinding({ doc, api: api as unknown as SceneApi, awareness, fns: excalidrawFns });
     binding.setReadOnly(readOnlyRef.current);
     bindingRef.current = binding;
-    onReadyRef.current?.({ exportAs: (format) => exportBoard(api, format) });
+    onReadyRef.current?.({ exportAs: (format) => exportBoard(api, format), refresh: () => api.refresh() });
     return () => {
       binding.destroy();
       bindingRef.current = null;
