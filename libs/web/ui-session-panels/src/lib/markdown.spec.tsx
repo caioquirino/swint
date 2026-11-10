@@ -41,4 +41,21 @@ describe('Markdown', () => {
     expect(MARKDOWN_PROSE).toContain('[&_ul[data-type=taskList]]');
     expect(MARKDOWN_PROSE).toContain('[&_.contains-task-list]');
   });
+
+  it('renders <br> inside table cells as a line break', () => {
+    const { container } = render(<Markdown source={'| A |\n| --- |\n| x<br>y |'} />);
+    expect(container.querySelector('td br')).not.toBeNull();
+  });
+
+  it('renders <br> outside tables as a line break and still drops other HTML', () => {
+    const { container } = render(<Markdown source={'one<br/>two <script>alert(1)</script><img src=x>'} />);
+    expect(container.querySelector('p br')).not.toBeNull();
+    expect(container.querySelector('script')).toBeNull();
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('styles h4 to h6', () => {
+    expect(MARKDOWN_PROSE).toContain('[&_h4]');
+    expect(MARKDOWN_PROSE).toContain('[&_h6]');
+  });
 });

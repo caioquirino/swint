@@ -64,14 +64,14 @@ interface RichMarkdownEditorProps {
 ```
 
 - **Extensions:**
-  - StarterKit (headings limited to levels 1–3; underline disabled because markdown has none).
+  - StarterKit (headings levels 1–6 are accepted so existing text is kept, and the toolbar offers 1–3; underline disabled because markdown has none).
   - Link (`openOnClick: false`; protocols limited to `http`, `https` and `mailto`).
   - TaskList and TaskItem (nested items allowed).
   - TableKit (header row on insert).
   - Markdown.
 - **Packages:** `@tiptap/markdown`, `@tiptap/extension-table` and `@tiptap/extension-list`, pinned to the workspace TipTap version (3.33.0).
-- **Markdown I/O:** the initial content loads as markdown (`contentType: 'markdown'`). Every update calls `onChange(editor.getMarkdown())`. Raw HTML is not parsed into the document.
-- **Normalization:** loading an existing template may change its markup (for example `*` bullets become `-`) without changing the content. Nothing is saved until the user clicks Save.
+- **Markdown I/O:** the initial content loads as markdown (`contentType: 'markdown'`). Every update calls `onChange(editor.getMarkdown())`. Inline HTML is parsed only into what the schema supports (for example `<b>` becomes bold); everything else, such as `<script>`, is dropped.
+- **Normalization:** loading an existing template may change its markup (for example `*` bullets become `-`) without changing the content. An unchanged section keeps its original text exactly; only an edited section is re-serialized. Nothing is saved until the user clicks Save.
 - **Paste:** pasted markdown text is parsed into rich content. Pasted HTML keeps only what the schema supports.
 - **Toolbar:** one row, wrapping on narrow screens.
   - Buttons: headings 1–3; bold, italic, strike, inline code; bullet, numbered and task list; quote; code block; link; table menu; undo and redo.
@@ -84,7 +84,7 @@ interface RichMarkdownEditorProps {
 
 ## 5. Room rendering
 
-- `Markdown` in `libs/web/ui-session-panels` adds `remarkPlugins={[remarkGfm]}` and keeps `skipHtml`.
+- `Markdown` in `libs/web/ui-session-panels` adds `remarkPlugins={[remarkGfm]}` and keeps `skipHtml`. A bare `<br>` inside markdown (for example in table cells) renders as a line break; all other HTML is still skipped.
 - **Prose styles** are shared by the renderer and the editor. They gain tables (borders, header row, horizontal scroll when wide), task lists (no bullet, checkbox aligned) and strikethrough, in light and dark themes.
 - **Room checklists** render read-only (disabled checkboxes, the react-markdown default).
 - **Scope:** everywhere `Markdown` is used, for both roles: the room's Instructions and Rubric tabs.
@@ -119,5 +119,5 @@ interface RichMarkdownEditorProps {
 
 ## 8. Open risks
 
-- **`@tiptap/markdown` fidelity:** some markdown constructs may not round-trip exactly, for example HTML blocks, footnotes and reference-style links. They aren't produced by the editor; on load they may be normalized or dropped. Mitigation: the round-trip unit tests cover everything the toolbar can produce.
+- **`@tiptap/markdown` fidelity:** some markdown constructs may not round-trip exactly, for example HTML blocks, footnotes and reference-style links. They aren't produced by the editor; on load they may be normalized or dropped. An edited section is normalized: `1)` becomes `1.`; loose lists become tight; footnotes and reference-style links are inlined or dropped; images are removed, with a notice shown; a literal paragraph starting with a block marker (`1. `, `# `) is written unescaped (an upstream @tiptap/markdown quirk). Mitigation: unchanged sections are never rewritten, and the round-trip unit tests cover everything the toolbar can produce.
 - **Hidden Excalidraw:** mounting while hidden relies on `refresh()` when the tab is shown. Covered by a unit test and the e2e drawing step.

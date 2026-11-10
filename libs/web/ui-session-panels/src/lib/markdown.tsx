@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 export const MARKDOWN_PROSE = [
   'text-sm leading-6 text-slate-800 dark:text-slate-100',
   '[&_h1]:mb-2 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mt-3 [&_h3]:font-semibold',
+  '[&_h4]:mt-3 [&_h4]:font-semibold [&_h5]:mt-2 [&_h5]:font-semibold [&_h6]:mt-2 [&_h6]:font-medium [&_h6]:text-slate-600 dark:[&_h6]:text-slate-300',
   '[&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5',
   '[&_code]:rounded [&_code]:bg-slate-100 dark:[&_code]:bg-slate-800 [&_code]:px-1',
   '[&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 dark:[&_pre]:bg-slate-800 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0',
@@ -22,11 +23,33 @@ export const MARKDOWN_PROSE = [
   '[&_ul[data-type=taskList]_li>label]:mt-0.5 [&_ul[data-type=taskList]_li>div]:flex-1 [&_ul[data-type=taskList]_p]:my-0',
 ].join(' ');
 
-/** Markdown from templates, with GFM (tables, task lists, strikethrough). Raw HTML is not rendered (`skipHtml`). */
+interface MdNode {
+  type: string;
+  value?: string;
+  children?: MdNode[];
+}
+
+const BR_HTML = /^<br\s*\/?>$/i;
+
+function brToBreak(node: MdNode): void {
+  if (!node.children) return;
+  node.children = node.children.map((child) => {
+    if (child.type === 'html' && BR_HTML.test(child.value ?? '')) return { type: 'break' };
+    brToBreak(child);
+    return child;
+  });
+}
+
+/** Remark plugin: a bare `<br>` (how editors write line breaks in table cells) becomes a break; other HTML stays skipped. */
+function remarkBr() {
+  return (tree: MdNode) => brToBreak(tree);
+}
+
+/** Markdown from templates, with GFM (tables, task lists, strikethrough). Raw HTML is not rendered (`skipHtml`), except a bare `<br>`, which becomes a line break. */
 export function Markdown({ source }: { source: string }) {
   return (
     <div className={MARKDOWN_PROSE}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBr]} skipHtml>
         {source}
       </ReactMarkdown>
     </div>

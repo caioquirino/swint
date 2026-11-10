@@ -114,4 +114,94 @@ describe('RichMarkdownEditor', () => {
     rerender(<RichMarkdownEditor label="Rubric" value="" onChange={onChange} />);
     expect(box).not.toHaveAttribute('aria-invalid');
   });
+
+  describe('existing content', () => {
+    const LEGACY = '#### x\n\n![a](https://b/c.png)\n\n- item';
+
+    it('keeps heading levels 4 to 6', () => {
+      const { editor } = setup('#### Four');
+      expect(screen.getByRole('heading', { name: 'Four' })).toHaveProperty('tagName', 'H4');
+      expect(editor.getMarkdown().trim()).toBe('#### Four');
+    });
+
+    it('does not report a change when the editor is only focused or selected', () => {
+      const { editor, onChange } = setup(LEGACY);
+      act(() => {
+        editor.commands.focus();
+        editor.commands.setTextSelection(2);
+        editor.commands.selectAll();
+      });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('reports the original text when an edit is undone back to it', () => {
+      const { editor, last } = setup('# T\n\n1) a');
+      act(() => {
+        editor.commands.insertContentAt(1, 'x');
+      });
+      expect(last()).not.toBe('# T\n\n1) a');
+      act(() => {
+        (editor.commands as unknown as { undo: () => boolean }).undo();
+      });
+      expect(last()).toBe('# T\n\n1) a');
+    });
+
+    it('reports the new markdown after a real edit', () => {
+      const { editor, last } = setup(LEGACY);
+      act(() => {
+        editor.commands.insertContentAt(1, 'new ');
+      });
+      expect(last()).toContain('#### new x');
+    });
+
+    it('notes that images will be removed on edit, only when there are images', () => {
+      const { unmount } = setup(LEGACY);
+      expect(screen.getByRole('note')).toHaveTextContent(
+        "This text contains images, which the editor can't show. They are kept unless you edit this section; editing it will remove them.",
+      );
+      unmount();
+      setup('# no images here');
+      expect(screen.queryByRole('note')).toBeNull();
+    });
+  });
+
+  describe('paste', () => {
+    function paste(box: HTMLElement, types: string[], text: string) {
+      const event = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', {
+        value: { types, getData: (type: string) => (type === 'text/plain' ? text : '') },
+      });
+      act(() => {
+        box.dispatchEvent(event);
+      });
+    }
+
+    it('leaves HTML clipboards to the default handler', () => {
+      const { box } = setup();
+      paste(box, ['text/plain', 'text/html'], '## x');
+      expect(screen.queryByRole('heading')).toBeNull();
+    });
+
+    it('parses markdown copied from a code editor even though it carries text/html', () => {
+      const { box } = setup();
+      paste(box, ['text/plain', 'text/html', 'vscode-editor-data'], '## x');
+      expect(screen.getByRole('heading', { name: 'x' })).toBeInTheDocument();
+    });
+
+    it('pastes literally inside a code block', () => {
+      const { box, editor } = setup('```\n\n```');
+      act(() => {
+        editor.commands.setTextSelection(1);
+      });
+      expect(editor.isActive('codeBlock')).toBe(true);
+      paste(box, ['text/plain'], '## x');
+      expect(screen.queryByRole('heading')).toBeNull();
+    });
+
+    it('does not intercept plain text that is not markdown', () => {
+      const { box } = setup();
+      paste(box, ['text/plain'], 'just words');
+      expect(screen.queryByRole('heading')).toBeNull();
+    });
+  });
 });

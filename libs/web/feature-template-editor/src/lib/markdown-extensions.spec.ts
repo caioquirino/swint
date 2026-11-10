@@ -3,7 +3,14 @@ import { Editor } from '@tiptap/core';
 // Load the extensions' type augmentations (Editor `contentType`, `insertTable`) into this project.
 import '@tiptap/markdown';
 import '@tiptap/extension-table';
-import { isAllowedLinkUrl, looksLikeMarkdown, templateExtensions, toMarkdown } from './markdown-extensions.js';
+import {
+  hasMarkdownImage,
+  isAllowedLinkUrl,
+  looksLikeMarkdown,
+  templateExtensions,
+  toMarkdown,
+  withoutImages,
+} from './markdown-extensions.js';
 
 const editors: Editor[] = [];
 const load = (markdown: string) => {
@@ -63,5 +70,15 @@ describe('template markdown', () => {
       expect(looksLikeMarkdown(text)).toBe(true);
     }
     for (const text of ['plain sentence.', 'a - b', 'price: 5 * 3']) expect(looksLikeMarkdown(text)).toBe(false);
+  });
+
+  it('keeps headings up to level 6', () => {
+    expect(toMarkdown(load('#### Four\n\n###### Six'))).toBe('#### Four\n\n###### Six');
+  });
+
+  it('detects images and replaces them with their alt text', () => {
+    expect(hasMarkdownImage('a ![x](https://b/c.png) b')).toBe(true);
+    expect(hasMarkdownImage('[x](https://b)')).toBe(false);
+    expect(withoutImages('![x](https://b/c.png)\n\ntext ![](u)')).toBe('x\n\ntext ');
   });
 });
