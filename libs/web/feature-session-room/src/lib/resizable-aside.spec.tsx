@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ResizableAside } from './resizable-aside.js';
 import { PANEL_STORAGE_KEY, loadPanelLayout } from './side-panel-layout.js';
 
@@ -62,5 +62,46 @@ describe('ResizableAside', () => {
     expect(aside().hidden).toBe(false);
     expect(aside().style.width).toBe('400px');
     expect(onLayoutChange).toHaveBeenCalledTimes(3);
+  });
+
+  it('displays the stored width clamped to the viewport', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 900, configurable: true });
+    localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify({ width: 720, collapsed: false }));
+    render(<ResizableAside>content</ResizableAside>);
+    expect(aside().style.width).toBe('540px');
+    expect(loadPanelLayout().width).toBe(720);
+  });
+
+  it('re-clamps on window resize and notifies', () => {
+    localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify({ width: 720, collapsed: false }));
+    const onLayoutChange = vi.fn();
+    render(<ResizableAside onLayoutChange={onLayoutChange}>content</ResizableAside>);
+    expect(aside().style.width).toBe('720px');
+    act(() => {
+      Object.defineProperty(window, 'innerWidth', { value: 900, configurable: true });
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(aside().style.width).toBe('540px');
+    expect(onLayoutChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores non-primary buttons and zero-delta clicks', () => {
+    const onLayoutChange = vi.fn();
+    render(<ResizableAside onLayoutChange={onLayoutChange}>content</ResizableAside>);
+    fireEvent.pointerDown(separator(), { clientX: 384, pointerId: 1, button: 2 });
+    fireEvent.pointerMove(separator(), { clientX: 484, pointerId: 1 });
+    expect(aside().style.width).toBe('384px');
+    fireEvent.pointerDown(separator(), { clientX: 384, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(separator(), { clientX: 384, pointerId: 1 });
+    expect(onLayoutChange).not.toHaveBeenCalled();
+    expect(localStorage.getItem(PANEL_STORAGE_KEY)).toBeNull();
+  });
+
+  it('jumps to min and max with Home and End', () => {
+    render(<ResizableAside>content</ResizableAside>);
+    fireEvent.keyDown(separator(), { key: 'Home' });
+    expect(aside().style.width).toBe('240px');
+    fireEvent.keyDown(separator(), { key: 'End' });
+    expect(aside().style.width).toBe('720px');
   });
 });

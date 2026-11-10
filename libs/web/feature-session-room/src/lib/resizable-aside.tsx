@@ -25,7 +25,14 @@ function Chevron({ direction }: { direction: 'left' | 'right' }) {
 export function ResizableAside({ children, onLayoutChange }: { children: ReactNode; onLayoutChange?: () => void }) {
   const [layout, setLayout] = useState<PanelLayout>(loadPanelLayout);
   const [commits, setCommits] = useState(0);
-  const widthRef = useRef(layout.width);
+  const [viewport, setViewport] = useState(() => window.innerWidth);
+  // The stored preference may exceed what this viewport allows: display the clamped width.
+  const width = clampWidth(layout.width, viewport);
+  const widthRef = useRef(width);
+  widthRef.current = width;
+  const widthShown = useRef(width);
+  widthShown.current = width;
+  const committed = useRef(layout);
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
   const onChangeRef = useRef(onLayoutChange);
   onChangeRef.current = onLayoutChange;
@@ -35,38 +42,54 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
     if (commits > 0) onChangeRef.current?.();
   }, [commits]);
 
+  useEffect(() => {
+    const onResize = () => {
+      const next = window.innerWidth;
+      setViewport(next);
+      if (clampWidth(layout.width, next) !== widthShown.current) setCommits((c) => c + 1);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [layout.width]);
+
   const commit = (next: PanelLayout) => {
-    widthRef.current = next.width;
+    if (next.width === committed.current.width && next.collapsed === committed.current.collapsed) return;
+    committed.current = next;
     setLayout(next);
     savePanelLayout(next);
     setCommits((c) => c + 1);
   };
 
-  const viewport = () => window.innerWidth;
-
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    drag.current = { startX: e.clientX, startWidth: layout.width };
+    if (e.button !== 0) return;
+    drag.current = { startX: e.clientX, startWidth: width };
     e.currentTarget.setPointerCapture?.(e.pointerId);
     e.preventDefault();
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
-    const width = clampWidth(d.startWidth + (e.clientX - d.startX), viewport());
-    widthRef.current = width;
-    setLayout((l) => ({ ...l, width }));
+    const next = clampWidth(d.startWidth + (e.clientX - d.startX), window.innerWidth);
+    widthRef.current = next;
+    setLayout((l) => ({ ...l, width: next }));
   };
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     if (!drag.current) return;
+    const d = drag.current;
     drag.current = null;
     e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (widthRef.current === d.startWidth) return;
     commit({ width: widthRef.current, collapsed: false });
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    let target: number;
+    if (e.key === 'ArrowLeft') target = width - PANEL_KEY_STEP;
+    else if (e.key === 'ArrowRight') target = width + PANEL_KEY_STEP;
+    else if (e.key === 'Home') target = PANEL_MIN_WIDTH;
+    else if (e.key === 'End') target = PANEL_MAX_WIDTH;
+    else return;
     e.preventDefault();
-    const delta = e.key === 'ArrowRight' ? PANEL_KEY_STEP : -PANEL_KEY_STEP;
-    commit({ width: clampWidth(layout.width + delta, viewport()), collapsed: false });
+    commit({ width: clampWidth(target, window.innerWidth), collapsed: false });
   };
 
   return (
@@ -80,7 +103,7 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
       ) : null}
       <aside
         hidden={layout.collapsed}
-        style={{ width: layout.width }}
+        style={{ width }}
         className="relative flex shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
       >
         <button
@@ -98,7 +121,7 @@ export function ResizableAside({ children, onLayoutChange }: { children: ReactNo
           aria-label="Resize side panel"
           aria-valuemin={PANEL_MIN_WIDTH}
           aria-valuemax={PANEL_MAX_WIDTH}
-          aria-valuenow={layout.width}
+          aria-valuenow={width}
           tabIndex={0}
           className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize touch-none hover:bg-blue-500/40 focus-visible:bg-blue-500/60 focus-visible:outline-none"
           onPointerDown={onPointerDown}
