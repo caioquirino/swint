@@ -29,4 +29,18 @@ test('the board offers Normal/Code fonts only, clean lines only, and a fixed lib
   await expect(board.getByText('Load balancer')).toBeVisible();
   await expect(board.locator('.library-menu-browse-button')).toBeHidden();
   await expect(board.locator('.library-menu-dropdown-container')).toBeHidden();
+  // Library only: no search tab switcher, no personal library (rendered by Excalidraw, hidden by our CSS).
+  await expect(board.locator('.default-sidebar .sidebar-triggers')).toBeAttached();
+  await expect(board.locator('.default-sidebar .sidebar-triggers')).toBeHidden();
+  await expect(board.getByText('Excalidraw Library')).toBeVisible();
+  await expect(board.getByText('Personal Library')).toBeAttached();
+  await expect(board.getByText('Personal Library')).toBeHidden();
+  await expect(board.locator('.library-menu-items__no-items')).toBeHidden();
+  // Find would open the sidebar on the hidden search tab: it is blocked. Focus inside the board first
+  // (Excalidraw ignores keys aimed at body); the tool click also closes the sidebar.
+  await page.getByTestId('toolbar-selection').click({ force: true });
+  await expect(board.locator('.default-sidebar')).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+f');
+  await expect(board.locator('.default-sidebar')).toHaveCount(0);
+  await expect(board.locator('.layer-ui__search')).toHaveCount(0);
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import '@excalidraw/excalidraw/index.css';
@@ -8,7 +8,7 @@ import { isSupportedElementType } from '@swint/shared-collab-protocol';
 import type { SceneApi } from '../binding/excalidraw-binding.js';
 import { BOARD_APP_STATE, enforceBoardStyle } from '../board-style.js';
 import { isSwintLibrary, SWINT_LIBRARY } from '../library/swint-library.js';
-import { BoardMenu, blockFileDrop, boardCanvasActions } from './board-menu.js';
+import { BoardMenu, blockFileDrop, boardCanvasActions, useBlockedShortcuts } from './board-menu.js';
 import { excalidrawFns } from './collaborative-board.js';
 
 export interface SeedBoardEditorProps {
@@ -21,8 +21,11 @@ export interface SeedBoardEditorProps {
 /** A local, non-collaborative Excalidraw used to author a template's starting board. */
 export function SeedBoardEditor({ initialElements, onChange, theme = 'light' }: SeedBoardEditorProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  useBlockedShortcuts('export', containerRef);
   return (
     <div
+      ref={containerRef}
       className="swint-board h-[420px] w-full overflow-hidden rounded-md border border-slate-300 dark:border-slate-700"
       data-testid="seed-board"
       onDragOverCapture={blockFileDrop}

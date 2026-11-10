@@ -63,7 +63,7 @@ export function CollaborativeBoard({ doc, awareness, readOnly, menu, theme = 'li
     };
   }, [api, doc, awareness]);
 
-  useBlockedShortcuts(menu === 'none', containerRef);
+  useBlockedShortcuts(menu, containerRef);
 
   useEffect(() => {
     bindingRef.current?.setReadOnly(readOnly);

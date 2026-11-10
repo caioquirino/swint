@@ -202,7 +202,7 @@ describe('CollaborativeBoard', () => {
       for (const init of shortcuts) expect(press(init, document.body).defaultPrevented).toBe(false);
     });
 
-    it('menu export: Save to and Export image only, no keys blocked', async () => {
+    it('menu export: Save to and Export image only, and only find is blocked', async () => {
       const { MainMenu } = await import('@excalidraw/excalidraw');
       render(<CollaborativeBoard doc={new Y.Doc()} awareness={null} readOnly={false} menu="export" />);
       expect(screen.getByTestId('board')).not.toHaveClass('swint-board--no-menu');
@@ -213,7 +213,10 @@ describe('CollaborativeBoard', () => {
       });
       const items = (Array.isArray(lastMenuChildren) ? lastMenuChildren : [lastMenuChildren]) as { type: unknown }[];
       expect(items.map((c) => c.type)).toEqual([MainMenu.DefaultItems.Export, MainMenu.DefaultItems.SaveAsImage]);
-      for (const init of shortcuts) expect(press(init).defaultPrevented).toBe(false);
+      // The board has no search: find is blocked for everyone; the other shortcuts stay with the interviewer.
+      for (const init of shortcuts) expect(press(init).defaultPrevented).toBe(init.key === 'f');
+      expect(press({ key: 'f', metaKey: true }).defaultPrevented).toBe(true);
+      expect(press({ key: 'f' }).defaultPrevented).toBe(false);
     });
 
     it('blocks file drags before they reach Excalidraw, but lets text drags through', () => {

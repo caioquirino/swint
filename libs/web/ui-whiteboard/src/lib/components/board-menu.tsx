@@ -28,13 +28,17 @@ export function boardCanvasActions(menu: BoardMenuKind) {
   };
 }
 
-/** Shortcuts that would reach hidden menu actions (help, open, save, find, theme). */
-const isBlockedShortcut = (event: KeyboardEvent): boolean => {
+const isFind = (event: KeyboardEvent): boolean => (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f';
+
+/** Shortcuts that would reach hidden UI: find (no board has search); help, open, save and theme too when there is no menu. */
+const isBlockedShortcut = (event: KeyboardEvent, menu: BoardMenuKind): boolean => {
+  if (isFind(event)) return true;
+  if (menu !== 'none') return false;
   const key = event.key.toLowerCase();
   if (key === '?') return true;
   if (key === 'd') return event.shiftKey && event.altKey;
   const mod = event.ctrlKey || event.metaKey;
-  return mod && (key === 'o' || key === 'f' || (key === 'e' && event.shiftKey));
+  return mod && (key === 'o' || (key === 'e' && event.shiftKey));
 };
 
 /** Mirrors Excalidraw: only text-like inputs, textareas and contenteditable swallow shortcuts (radios and checkboxes do not). */
@@ -57,15 +61,14 @@ export const blockFileDrop = (event: DragEvent): void => {
   }
 };
 
-export function useBlockedShortcuts(enabled: boolean, boardRef: RefObject<HTMLElement | null>): void {
+export function useBlockedShortcuts(menu: BoardMenuKind, boardRef: RefObject<HTMLElement | null>): void {
   useEffect(() => {
-    if (!enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!isBoardTarget(event.target, boardRef.current) || isEditable(event.target) || !isBlockedShortcut(event)) return;
+      if (!isBoardTarget(event.target, boardRef.current) || isEditable(event.target) || !isBlockedShortcut(event, menu)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
     };
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [enabled, boardRef]);
+  }, [menu, boardRef]);
 }

@@ -23,4 +23,15 @@ describe('SeedBoardEditor', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(onDrop).not.toHaveBeenCalled();
   });
+
+  it('blocks find, since the board has no search', () => {
+    render(<SeedBoardEditor initialElements={[]} onChange={() => undefined} />);
+    const press = (init: KeyboardEventInit) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+      screen.getByTestId('excalidraw').dispatchEvent(event);
+      return event;
+    };
+    expect(press({ key: 'f', ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(press({ key: 'o', ctrlKey: true }).defaultPrevented).toBe(false);
+  });
 });

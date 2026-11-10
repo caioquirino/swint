@@ -17,6 +17,20 @@
   display: none !important;
 }
 
+/* The sidebar is the fixed library only: no search tab, and no personal library (nothing can be added to it,
+   so hide its header, empty-state hint and the selected-elements "add" grid that precedes the Excalidraw header). */
+.swint-board .default-sidebar .sidebar-triggers,
+.swint-board .library-menu-items-container__header:not(.library-menu-items-container__header--excal),
+.swint-board .library-menu-items__no-items,
+.swint-board .library-menu-items-container__grid:has(~ .library-menu-items-container__header--excal) {
+  display: none !important;
+}
+
+/* With the personal library gone, the Excalidraw Library header is the first thing: drop its separating margin. */
+.swint-board .library-menu-items-container__header--excal {
+  margin-top: 0 !important;
+}
+
 /* Candidates get no main menu: hide its trigger (shortcuts are blocked in code). */
 .swint-board--no-menu [data-testid='main-menu-trigger'] {
   display: none !important;
