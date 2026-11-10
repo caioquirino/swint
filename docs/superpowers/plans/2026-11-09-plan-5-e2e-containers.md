@@ -2849,6 +2849,126 @@ git commit -m "feat(web-ui-whiteboard): Normal/Code fonts only, clean lines, fix
 
 ---
 
+### Task 14: Board chrome — menus per role and a global light/dark/system theme
+
+Product decision (2026-11-09, user-approved):
+- **Candidate:** no Excalidraw main menu at all (the hamburger is hidden). Its actions are unreachable by keyboard too.
+- **Interviewer (live room and template editor):** the main menu has only **Save to…** (`MainMenu.DefaultItems.Export`, the `.excalidraw` file dialog) and **Export image…** (`MainMenu.DefaultItems.SaveAsImage`). Open, Reset the canvas, Find on canvas, Help, the Excalidraw links, Dark mode and Canvas background are gone. Open and Reset would overwrite the shared board for everyone.
+- **Theme:** one light / dark / system switch at the top right of every page. It is saved per browser and drives both the app's styles and Excalidraw's `theme`. Excalidraw's own dark-mode toggle is removed so there is only one control.
+
+Facts verified in the Excalidraw 0.18.1 bundle (`node_modules/@excalidraw/excalidraw/dist/dev/index.js`):
+- `MainMenu.DefaultItems` exports `LoadScene` ("Open"), `SaveToActiveFile`, `Export` ("Save to…"), `SaveAsImage` ("Export image…"), `SearchMenu`, `Help`, `ClearCanvas`, `Socials`, `ToggleTheme`, `ChangeCanvasBackground`. Rendering `<MainMenu>` as a child of `<Excalidraw>` replaces the default menu contents.
+- The hamburger is `[data-testid="main-menu-trigger"]` (class `main-menu-trigger`).
+- `actionToggleTheme`'s predicate is `!!app.props.UIOptions.canvasActions.toggleTheme`. With `theme` passed as a prop and `canvasActions.toggleTheme: null`, the toggle (and Shift+Alt+D) is disabled and the prop controls the theme.
+- `UIOptions.canvasActions` keys: `changeViewBackgroundColor`, `clearCanvas`, `export` (`false` or `{ saveFileToDisk: boolean }`), `loadScene`, `saveAsImage`, `saveToActiveFile`, `toggleTheme`. Setting an action's key to `false` also disables its keyboard shortcut (Ctrl+O, Ctrl+Shift+E, …).
+
+**Files:**
+- Create: `libs/web/ui-primitives/src/lib/theme.tsx` and `theme.spec.tsx`
+- Modify: `libs/web/ui-primitives/src/index.ts`, `libs/web/ui-primitives/src/lib/screen.tsx` (and any primitive with hard-coded light colours: button, badge, card, dialog, copy-field)
+- Modify: `apps/web/src/styles.css` (Tailwind dark variant, dark body colours), `apps/web/src/app/app.tsx` (`ThemeProvider` at the root)
+- Modify: `libs/web/ui-whiteboard/src/lib/components/collaborative-board.tsx`, `collaborative-board.css`, `collaborative-board.spec.tsx`, `seed-board-editor.tsx`; create `libs/web/ui-whiteboard/src/lib/components/board-menu.tsx`
+- Modify: `libs/web/feature-session-room/src/lib/live-room.tsx` (pass `menu` and `theme`, add the toggle to the header)
+- Modify: `libs/web/feature-dashboard/src/lib/app-header.tsx` (toggle), `libs/web/feature-template-editor/src/lib/template-editor-page.tsx` (theme to the seed editor)
+- Modify: `dark:` variants on every web component that uses `bg-white`, `bg-slate-*`, `text-slate-*`, `border-slate-*` (18 files: `grep -rlE "bg-white|bg-slate|text-slate|border-slate" libs/web apps/web/src`)
+- Create: `apps/web-e2e/src/board-chrome.spec.ts`
+
+**Interfaces:**
+- Produces, from `@swint/web-ui-primitives` (`theme.tsx`):
+  - `type ThemePreference = 'light' | 'dark' | 'system'`, `type ResolvedTheme = 'light' | 'dark'`
+  - `THEME_STORAGE_KEY = 'swint.theme'`
+  - `ThemeProvider({ children })`: reads the preference from localStorage (try/catch; default `'system'`), follows `matchMedia('(prefers-color-scheme: dark)')` changes while on `'system'`, and sets `document.documentElement.classList.toggle('dark', resolved === 'dark')` and `document.documentElement.style.colorScheme = resolved`.
+  - `useTheme(): { preference: ThemePreference; resolved: ResolvedTheme; setPreference(p: ThemePreference): void }`. Outside a provider it returns `{ preference: 'system', resolved: 'light', setPreference: () => undefined }` so lib specs need no provider.
+  - `ThemeToggle()`: a three-option segmented control (`role="radiogroup"`, `aria-label="Theme"`, each option a `role="radio"` button with `aria-checked`, accessible names "Light", "Dark", "System", small sun / moon / monitor inline SVG icons).
+- Produces, from `@swint/web-ui-whiteboard`: `CollaborativeBoardProps` gains `menu: 'none' | 'export'` and `theme?: 'light' | 'dark'` (default `'light'`). `SeedBoardEditorProps` gains `theme?: 'light' | 'dark'`. Exported `BOARD_MENU_SHORTCUT_BLOCKLIST` is not needed outside the lib; keep it internal.
+
+- [ ] **Step 1: Theme provider (TDD).** In `theme.spec.tsx`, with a stubbed `matchMedia` and localStorage, test: (a) default is `system` and resolves from `matchMedia`; (b) `setPreference('dark')` adds the `dark` class to `<html>`, sets `colorScheme`, and writes `swint.theme`; (c) a stored `'light'` is read on mount; (d) while on `system`, a `change` event on the media query flips `resolved`; (e) a throwing localStorage still renders and defaults to `system`; (f) `ThemeToggle` marks the active option `aria-checked="true"` and clicking "Dark" selects it. Implement `theme.tsx` to pass. Export it from the lib's `index.ts`.
+
+- [ ] **Step 2: Dark styles.** In `apps/web/src/styles.css` add `@custom-variant dark (&:where(.dark, .dark *));` after the Tailwind import and give `body` `dark:bg-slate-950 dark:text-slate-100`. Add `dark:` variants to every component in the grep above, using this mapping: `bg-white` → `dark:bg-slate-900`; `bg-slate-50` → `dark:bg-slate-950`; `bg-slate-100` → `dark:bg-slate-800`; `border-slate-100|200` → `dark:border-slate-800`; `border-slate-300` → `dark:border-slate-700`; `text-slate-900|800` → `dark:text-slate-100`; `text-slate-700|600` → `dark:text-slate-300`; `text-slate-500` → `dark:text-slate-400`; `text-blue-700` → `dark:text-blue-400`; status chips (`bg-red-50/100`, `bg-amber-50/100`, `bg-green-100`, …) → the `-950` background with the `-200` text of the same hue. Markdown panels: add `dark:prose-invert` where `prose` is used. Don't touch spec files.
+
+- [ ] **Step 3: Toggle placement.** Wrap `App`'s tree in `ThemeProvider`. Render `<ThemeToggle />` at the right end of `AppHeader` (before the user name), at the right end of the `LiveRoom` header (after the session controls / export menu), and in `Screen` as `absolute right-4 top-4` (give `Screen`'s `<main>` `relative`) so the candidate's waiting room, ended, invalid-link and not-found pages have it too. `Screen` always renders it; `useTheme`'s provider-less fallback keeps lib specs working without a provider.
+
+- [ ] **Step 4: Board menu and theme (TDD).** In `collaborative-board.spec.tsx` (the Excalidraw mock captures props and children) test:
+  - `menu="none"`: the `swint-board--no-menu` class is on `[data-testid="board"]`; `UIOptions.canvasActions` is `{ changeViewBackgroundColor: false, clearCanvas: false, export: false, loadScene: false, saveAsImage: false, saveToActiveFile: false, toggleTheme: null }`; a `keydown` for `?`, `Ctrl+O`, `Ctrl+Shift+E`, `Ctrl+F` and `Shift+Alt+D` dispatched on `document` while the board is mounted is `defaultPrevented` and does not propagate past the capture listener; the same keys are not blocked after unmount, and are not blocked when the target is an `input`, `textarea` or `[contenteditable]`.
+  - `menu="export"`: `canvasActions` is the same but with `export: { saveFileToDisk: true }` and `saveAsImage: true`; the rendered `BoardMenu` contains exactly `MainMenu.DefaultItems.Export` and `MainMenu.DefaultItems.SaveAsImage`; no keys are blocked.
+  - `theme="dark"` is passed through to `<Excalidraw theme>`.
+  Implement: `board-menu.tsx` exports `BoardMenu({ menu })` returning `<MainMenu>` with the two items for `'export'` and an empty `<MainMenu />` for `'none'` (the CSS hides its trigger); `boardCanvasActions(menu)`; and `useBlockedShortcuts(enabled)`, a `document` capture-phase `keydown` listener that calls `preventDefault()` + `stopImmediatePropagation()` for the five shortcuts (match `event.key` case-insensitively; `?` regardless of Shift; Ctrl or Meta for the modifier ones) unless the target is editable. In `collaborative-board.css` add `.swint-board--no-menu [data-testid='main-menu-trigger'] { display: none !important; }`.
+
+- [ ] **Step 5: Wire it.** `LiveRoom` passes `menu={interviewer ? 'export' : 'none'}` and `theme={useTheme().resolved}` to `CollaborativeBoard`. `SeedBoardEditor` always uses the `'export'` menu (shared `BoardMenu` and `boardCanvasActions`) and takes `theme`; `TemplateEditorPage` passes `useTheme().resolved`. Add `@swint/web-ui-primitives` to `web-ui-whiteboard`'s deps only if non-spec code there imports it (it should not: theme comes in as a prop).
+
+- [ ] **Step 6: E2E.** `apps/web-e2e/src/board-chrome.spec.ts`, reusing the Task 11 helpers (interviewer login, create + start a session, candidate joins in a second context):
+  - Candidate board: `getByTestId('main-menu-trigger')` is hidden while `getByTestId('toolbar-rectangle')` is visible (positive control). Pressing `Control+Shift+E` on the canvas opens no dialog (`.Modal` count stays 0).
+  - Interviewer board: click `main-menu-trigger` (`force: true`, per the Task 11 ruling); the menu shows "Save to…" and "Export image…" and does not show "Open", "Reset the canvas", "Help" or "Dark mode".
+  - Theme: on the dashboard, click the "Dark" radio; `<html>` has class `dark`; reload; still `dark`; open the room: `.excalidraw.theme--dark` exists. Click "System" with `page.emulateMedia({ colorScheme: 'light' })`; `<html>` loses `dark`.
+
+- [ ] **Step 7: Verify and commit.** `pnpm nx run-many -t lint test typecheck build`, `pnpm nx format:check`, `pnpm nx e2e web-e2e`. Commit: `feat(web): role-based board menus and a global light/dark/system theme`.
+
+---
+
+### Task 15: Remote laser pointer
+
+Product decision (2026-11-09, user-approved): the laser pointer is visible to every participant while it is held down. It is streamed over awareness only; nothing is stored or replayed.
+
+Root cause (verified in the 0.18.1 bundle, `index.js` ~23969): Excalidraw draws a collaborator's laser trail only while `collaborator.pointer.tool === 'laser'` **and** `collaborator.button === 'down'`, and ends it on `'up'`. `onPointerUpdate` already gives us `{ pointer, button }`, but the binding drops `button`, and `awarenessUserSchema.pointer` (a strict `z.object`) would strip it on the server anyway. The trails render in `.SVGLayer svg` as `path` elements.
+
+**Files:**
+- Modify: `libs/shared/collab-protocol/src/lib/awareness.ts` (+ spec), `libs/shared/collab-protocol/src/lib/presence.ts` (+ spec)
+- Modify: `libs/web/ui-whiteboard/src/lib/binding/excalidraw-binding.ts`, `excalidraw-binding.spec.ts`, `libs/web/ui-whiteboard/src/lib/components/collaborative-board.tsx`
+- Modify: `libs/api/feature-auth/src/lib/oidc.ts` (+ spec) — carry-in from the final review
+- Create: `apps/web-e2e/src/laser.spec.ts`
+
+**Interfaces:**
+- `awarenessUserSchema.pointer` becomes `z.object({ x: z.number(), y: z.number(), tool: z.enum(['pointer', 'laser']), button: z.enum(['up', 'down']).optional() }).optional()`. `stampAwarenessState` keeps `button` through `pointerSchema` with no other change.
+- `SceneCollaborator` gains `button?: 'up' | 'down'`.
+- `ExcalidrawBinding.handlePointer(pointer: Pointer, button?: 'up' | 'down')`; `Pointer` now includes the optional `button`.
+
+- [ ] **Step 1: Protocol (TDD).** Specs: a pointer with `button: 'down'` parses and survives `stampAwarenessState`; `button: 'sideways'` makes the pointer invalid (dropped by the stamp, as today for a bad pointer); a pointer without `button` still parses. Implement the schema change.
+
+- [ ] **Step 2: Binding (TDD).** Specs in `excalidraw-binding.spec.ts`:
+  - The published pointer carries `button`.
+  - A **button change** (`up`→`down` or `down`→`up`) is sent immediately even inside the 33 ms window, and cancels any pending trailing send (the trailing send would otherwise re-send stale state). Then the normal throttle resumes from that send.
+  - Within the window, moves with the same button are still throttled (leading + trailing, as today).
+  - A peer whose awareness pointer has `{ tool: 'laser', button: 'down' }` appears in `updateScene({ collaborators })` with `button: 'down'` at the collaborator level and `pointer: { x, y, tool }`.
+  Implement: track `lastSentButton`; in `handlePointer`, if `button !== lastSentButton` clear the timer and `sendPointer()` now. In `handleAwareness`, map `user.pointer.button` to `collaborator.button` and keep `pointer` as `{ x, y, tool }`.
+  In `collaborative-board.tsx`: `onPointerUpdate={({ pointer, button }) => bindingRef.current?.handlePointer(pointer, button)}`.
+
+- [ ] **Step 3: OIDC back-channel port (carry-in).** In `backchannelFetch` (`oidc.ts`), set `target.port = internal.port` together with `target.host`/`protocol`, so a public issuer with an explicit port (`http://localhost:8080`) rewritten to an internal URL on the default port (`http://keycloak`) gives `http://keycloak/…`, not `http://keycloak:8080/…`. Add that spec case; the existing `//`-path case must still pass.
+
+- [ ] **Step 4: E2E.** `apps/web-e2e/src/laser.spec.ts`: interviewer + candidate in the live room (Task 11 helpers). The candidate presses `k` (laser) with the canvas focused, then `mouse.move` to the board centre, `mouse.down()`, moves in 10 steps of 20 px, and keeps the button down. The interviewer page sees `.SVGLayer svg path` count > 0 within 5 s (positive check). After the candidate's `mouse.up()`, the interviewer's paths disappear within 5 s (the trail fades). Also assert the candidate's board element count did not change (the laser draws nothing). If the `k` shortcut is not active in the candidate's toolbar, select the laser from the extra-tools menu (`force: true`) and note it in the report.
+
+- [ ] **Step 5: Verify and commit.** Same commands as Task 14. Commit: `feat(whiteboard): stream laser pointer button state so remote laser trails render`.
+
+---
+
+### Task 16: Resizable and collapsible side panel
+
+Product decision (2026-11-09, user-approved): the room's left panel (Instructions / Rubric / Notes) can be resized by dragging and collapsed or expanded. Width and collapsed state are saved per browser.
+
+**Files:**
+- Create: `libs/web/feature-session-room/src/lib/side-panel-layout.ts` and `side-panel-layout.spec.ts`
+- Create: `libs/web/feature-session-room/src/lib/resizable-aside.tsx` and `resizable-aside.spec.tsx`
+- Modify: `libs/web/feature-session-room/src/lib/live-room.tsx` (+ its spec where the aside is asserted)
+- Modify: `libs/web/ui-whiteboard/src/lib/components/collaborative-board.tsx` (`BoardHandle.refresh()`)
+- Create: `apps/web-e2e/src/side-panel.spec.ts`
+
+**Interfaces:**
+- `side-panel-layout.ts`: `PANEL_STORAGE_KEY = 'swint.room.panel'`, `PANEL_DEFAULT_WIDTH = 384`, `PANEL_MIN_WIDTH = 240`, `PANEL_MAX_WIDTH = 720`, `PANEL_KEY_STEP = 16`, `clampWidth(w: number, viewport: number): number` (clamps to `[MIN, min(MAX, viewport * 0.6)]`), `loadPanelLayout(): { width: number; collapsed: boolean }` and `savePanelLayout(layout)` (both try/catch; invalid stored JSON → defaults).
+- `ResizableAside({ children, onLayoutChange? })`: owns the layout state.
+  - Expanded: an `<aside>` with inline `style={{ width }}` and a collapse button (`aria-label="Collapse side panel"`, chevron-left icon) in the panel's tab row, plus a 6 px drag handle on its right edge: `role="separator"`, `aria-orientation="vertical"`, `aria-label="Resize side panel"`, `aria-valuemin/max/now`, `tabIndex={0}`, `cursor-col-resize`.
+  - Pointer drag uses `setPointerCapture`; width follows `startWidth + (clientX - startX)`, clamped; it saves on pointer up. ArrowLeft / ArrowRight change the width by `PANEL_KEY_STEP` and save. Double-click on the handle resets to the default.
+  - Collapsed: a 40 px rail with an expand button (`aria-label="Expand side panel"`, chevron-right icon). The children stay mounted but hidden (`hidden` attribute) so the notes editor's state and its Yjs binding survive collapse.
+  - `onLayoutChange` fires after every committed change (drag end, key, collapse, expand).
+- `BoardHandle` gains `refresh(): void`, which calls Excalidraw's `api.refresh()` so the canvas re-measures its offsets after the container changes size.
+
+- [ ] **Step 1: Layout helpers (TDD).** Specs for `clampWidth` (below min, above max, viewport cap), `loadPanelLayout` (missing → defaults, valid round-trip, invalid JSON → defaults, throwing storage → defaults), `savePanelLayout` (throwing storage does not throw). Implement.
+
+- [ ] **Step 2: ResizableAside (TDD).** Testing Library specs: renders at the stored width; a pointer drag from x=384 to x=484 ends at width 484 and saves; dragging past the max clamps; ArrowRight adds 16; collapse hides the content (still in the DOM) and shows "Expand side panel"; expand restores the previous width; `onLayoutChange` is called once per committed change; the separator exposes `aria-valuenow`. Implement.
+
+- [ ] **Step 3: Wire it.** In `LiveRoom` replace `<aside className="flex w-96 …">` with `<ResizableAside onLayoutChange={() => board?.refresh()}>`, keeping the existing tab row and panels as children (the collapse button sits at the end of the tab row). Add `refresh` to the `BoardHandle` given to `onReady` in `CollaborativeBoard`. Keep the existing `LiveRoom` specs green (update selectors only if they relied on `w-96`).
+
+- [ ] **Step 4: E2E.** `apps/web-e2e/src/side-panel.spec.ts` (interviewer only is enough): drag the "Resize side panel" separator 120 px right → the aside's bounding width grows by ~120 (±4) and the board's shrinks; reload → width persists; click "Collapse side panel" → the "Instructions" tab is hidden and the board is wider than before; click "Expand side panel" → the width is restored; then draw a rectangle (Task 11 helper, `force: true`) and check the element count rises by 1 — this proves pointer coordinates still line up after the resize.
+
+- [ ] **Step 5: Verify and commit.** Same commands as Task 14. Commit: `feat(session-room): resizable, collapsible side panel`.
+
 ## Spec and carry-forward coverage
 
 | Requirement | Task |
@@ -2875,3 +2995,7 @@ git commit -m "feat(web-ui-whiteboard): Normal/Code fonts only, clean lines, fix
 | Plan 4 polish: archive failure, not_started backoff, generator leftovers (.babelrc, README stubs, nx.json babel, extensionless import), `useNow` after end, NotesEditor `user` changes | 7 (import), 8 |
 | Plan 3: orphaned S3 seeds, session-read performance | Deferred (Global Constraints) |
 | Product decision 2026-11-09: no hand-written font (Normal = Nunito, Code = Comic Shanns), clean lines only, fixed vendor-neutral library | 13 |
+| Product decision 2026-11-09 (follow-up): candidate has no board menu; interviewer menu = Save to + Export image; global light/dark/system theme | 14 |
+| Product decision 2026-11-09 (follow-up): remote laser pointer, streamed only | 15 |
+| Product decision 2026-11-09 (follow-up): resizable, collapsible side panel | 16 |
+| Final review Low: OIDC back-channel keeps the public port | 15 (Step 3) |
