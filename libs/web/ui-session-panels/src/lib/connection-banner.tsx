@@ -11,7 +11,11 @@ export function ConnectionBanner({ state }: { state: BannerState }) {
   return (
     <div
       role="status"
-      className={state === 'unreachable' ? 'bg-red-50 px-4 py-2 text-sm text-red-800' : 'bg-amber-50 px-4 py-2 text-sm text-amber-900'}
+      className={
+        state === 'unreachable'
+          ? 'bg-red-50 dark:bg-red-950 px-4 py-2 text-sm text-red-800 dark:text-red-200'
+          : 'bg-amber-50 dark:bg-amber-950 px-4 py-2 text-sm text-amber-900 dark:text-amber-200'
+      }
     >
       {text[state]}
     </div>

@@ -6,3 +6,4 @@ export * from './lib/dialog.js';
 export * from './lib/screen.js';
 export * from './lib/copy-field.js';
 export * from './lib/spinner.js';
+export * from './lib/theme.js';

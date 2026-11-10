@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Link, Route, Routes, useSearchParams } from 'react-router';
 import { ApiProvider, createApiClient, createQueryClient } from '@swint/web-data-access-api';
-import { Screen, Spinner } from '@swint/web-ui-primitives';
+import { Screen, Spinner, ThemeProvider } from '@swint/web-ui-primitives';
 
 const InterviewerLayout = lazy(() => import('@swint/web-feature-dashboard').then((m) => ({ default: m.InterviewerLayout })));
 const DashboardPage = lazy(() => import('@swint/web-feature-dashboard').then((m) => ({ default: m.DashboardPage })));
@@ -15,7 +15,7 @@ export function NotFound() {
     <Screen
       title="Page not found"
       actions={
-        <Link className="text-blue-700 underline" to="/">
+        <Link className="text-blue-700 dark:text-blue-400 underline" to="/">
           Go home
         </Link>
       }
@@ -60,12 +60,14 @@ export function App() {
   const [client] = useState(() => createApiClient());
   const [queryClient] = useState(createQueryClient);
   return (
-    <QueryClientProvider client={queryClient}>
-      <ApiProvider client={client}>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </ApiProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ApiProvider client={client}>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </ApiProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

@@ -7,7 +7,7 @@ export function CopyField({ label, value }: { label: string; value: string }) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <div>
-      <label htmlFor={id} className="text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
       <div className="mt-1 flex gap-2">
@@ -16,7 +16,7 @@ export function CopyField({ label, value }: { label: string; value: string }) {
           id={id}
           readOnly
           value={value}
-          className="min-w-0 flex-1 rounded-md border border-slate-300 bg-slate-50 px-3 text-sm"
+          className="min-w-0 flex-1 rounded-md border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3 text-sm"
           onFocus={(e) => e.currentTarget.select()}
         />
         <Button

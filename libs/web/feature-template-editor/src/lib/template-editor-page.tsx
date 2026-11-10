@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { templateInputSchema, type Template } from '@swint/shared-api-contract';
 import type { SyncedElement } from '@swint/shared-collab-protocol';
 import { apiError, useApi, useOrpc } from '@swint/web-data-access-api';
-import { Button, Screen, Spinner } from '@swint/web-ui-primitives';
+import { Button, Screen, Spinner, useTheme } from '@swint/web-ui-primitives';
 import { SeedBoardEditor } from '@swint/web-ui-whiteboard';
 import { MarkdownField } from './markdown-field.js';
 
@@ -48,6 +48,7 @@ export function TemplateEditorPage() {
 
 function TemplateForm({ loaded, initialElements }: { loaded: Template | null; initialElements: SyncedElement[] }) {
   const api = useApi();
+  const { resolved: theme } = useTheme();
   const orpc = useOrpc();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -126,10 +127,10 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
               aria-label="Title"
               value={form.title}
               onChange={(e) => set('title')(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5"
+              className="mt-1 block w-full rounded-md border border-slate-300 dark:border-slate-700 px-2 py-1.5"
             />
             {errors.title ? (
-              <span role="alert" className="text-xs text-red-700">
+              <span role="alert" className="text-xs text-red-700 dark:text-red-400">
                 {errors.title}
               </span>
             ) : null}
@@ -143,10 +144,10 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
               max={240}
               value={form.durationMin}
               onChange={(e) => set('durationMin')(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1.5"
+              className="mt-1 block w-full rounded-md border border-slate-300 dark:border-slate-700 px-2 py-1.5"
             />
             {errors.durationMin ? (
-              <span role="alert" className="text-xs text-red-700">
+              <span role="alert" className="text-xs text-red-700 dark:text-red-400">
                 {errors.durationMin}
               </span>
             ) : null}
@@ -162,15 +163,15 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
         />
         <div>
           <p className="mb-1 text-sm font-medium">Starting board</p>
-          <SeedBoardEditor initialElements={initialElements} onChange={onBoardChange} />
+          <SeedBoardEditor initialElements={initialElements} onChange={onBoardChange} theme={theme} />
           {errors.boardSeed ? (
-            <p role="alert" className="text-xs text-red-700">
+            <p role="alert" className="text-xs text-red-700 dark:text-red-400">
               {errors.boardSeed}
             </p>
           ) : null}
         </div>
         {saveError ? (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-sm text-red-700 dark:text-red-400">
             {saveError}
           </p>
         ) : null}

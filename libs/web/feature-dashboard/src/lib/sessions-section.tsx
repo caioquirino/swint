@@ -22,7 +22,7 @@ export function SessionsSection() {
             aria-label="Status"
             value={status}
             onChange={(e) => setStatus(e.target.value as SessionStatus | '')}
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded border border-slate-300 dark:border-slate-700 px-2 py-1"
           >
             <option value="">All</option>
             {STATUSES.map((s) => (
@@ -35,13 +35,13 @@ export function SessionsSection() {
       </div>
       {sessions.isPending ? <Spinner /> : null}
       {sessions.isError ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
           Could not load sessions.
         </p>
       ) : null}
       {sessions.data ? (
         <table aria-label="Sessions" className="w-full text-left text-sm">
-          <thead className="text-slate-500">
+          <thead className="text-slate-500 dark:text-slate-400">
             <tr>
               <th className="py-2">Candidate</th>
               <th>Template</th>
@@ -51,9 +51,9 @@ export function SessionsSection() {
           </thead>
           <tbody>
             {sessions.data.map((s) => (
-              <tr key={s.id} className="border-t border-slate-100">
+              <tr key={s.id} className="border-t border-slate-100 dark:border-slate-800">
                 <td className="py-2">
-                  <Link className="text-blue-700 hover:underline" to={`/s/${s.id}`}>
+                  <Link className="text-blue-700 dark:text-blue-400 hover:underline" to={`/s/${s.id}`}>
                     {s.candidateName}
                   </Link>
                 </td>
@@ -66,7 +66,7 @@ export function SessionsSection() {
             ))}
             {sessions.data.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-4 text-slate-500">
+                <td colSpan={4} className="py-4 text-slate-500 dark:text-slate-400">
                   No sessions yet.
                 </td>
               </tr>

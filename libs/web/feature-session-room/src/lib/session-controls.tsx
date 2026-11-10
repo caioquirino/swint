@@ -90,7 +90,7 @@ export function SessionControls({ sessionId, status }: { sessionId: string; stat
         New candidate link
       </Button>
       {failed ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
           {describeError(failed.error)}
         </p>
       ) : null}
@@ -108,11 +108,11 @@ export function SessionControls({ sessionId, status }: { sessionId: string; stat
               value={reason}
               maxLength={500}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 p-2"
+              className="mt-1 block w-full rounded-md border border-slate-300 dark:border-slate-700 p-2"
             />
           </label>
           {cancel.isError ? (
-            <p role="alert" className="text-sm text-red-700">
+            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
               {describeError(cancel.error)}
             </p>
           ) : null}

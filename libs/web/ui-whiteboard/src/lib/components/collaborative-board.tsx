@@ -9,6 +9,7 @@ import { ExcalidrawBinding, type ExcalidrawFns, type SceneApi } from '../binding
 import './collaborative-board.css';
 import { BOARD_APP_STATE } from '../board-style.js';
 import { isSwintLibrary, SWINT_LIBRARY } from '../library/swint-library.js';
+import { BoardMenu, boardCanvasActions, useBlockedShortcuts, type BoardMenuKind } from './board-menu.js';
 import { exportBoard, type ExportFormat } from '../export.js';
 
 /** The real Excalidraw functions. Casts happen here, once, at the boundary to Excalidraw's branded types. */
@@ -30,13 +31,16 @@ export interface CollaborativeBoardProps {
   doc: Y.Doc;
   awareness: Awareness | null;
   readOnly: boolean;
+  /** `none`: no main menu at all (candidates). `export`: Save to… and Export image… only (interviewers). */
+  menu: BoardMenuKind;
+  theme?: 'light' | 'dark';
   onReady?: (handle: BoardHandle) => void;
 }
 
 const hasImageFile = (event: ClipboardEvent | null): boolean =>
   Array.from(event?.clipboardData?.files ?? []).some((file) => file.type.startsWith('image/'));
 
-export function CollaborativeBoard({ doc, awareness, readOnly, onReady }: CollaborativeBoardProps) {
+export function CollaborativeBoard({ doc, awareness, readOnly, menu, theme = 'light', onReady }: CollaborativeBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const bindingRef = useRef<ExcalidrawBinding | null>(null);
@@ -57,12 +61,19 @@ export function CollaborativeBoard({ doc, awareness, readOnly, onReady }: Collab
     };
   }, [api, doc, awareness]);
 
+  useBlockedShortcuts(menu === 'none');
+
   useEffect(() => {
     bindingRef.current?.setReadOnly(readOnly);
   }, [readOnly]);
 
   return (
-    <div ref={containerRef} className="swint-board h-full w-full" data-testid="board" data-element-count="0">
+    <div
+      ref={containerRef}
+      className={`swint-board h-full w-full${menu === 'none' ? ' swint-board--no-menu' : ''}`}
+      data-testid="board"
+      data-element-count="0"
+    >
       <Excalidraw
         excalidrawAPI={setApi}
         isCollaborating
@@ -72,7 +83,8 @@ export function CollaborativeBoard({ doc, awareness, readOnly, onReady }: Collab
           if (!isSwintLibrary(items)) void api?.updateLibrary({ libraryItems: SWINT_LIBRARY as never, merge: false });
         }}
         viewModeEnabled={readOnly}
-        UIOptions={{ tools: { image: false } }}
+        theme={theme}
+        UIOptions={{ tools: { image: false }, canvasActions: boardCanvasActions(menu) }}
         onChange={(elements, appState) => {
           // Written to the DOM directly (no re-render): e2e tests read it to see remote edits arrive.
           if (containerRef.current) containerRef.current.dataset['elementCount'] = String(elements.filter((e) => !e.isDeleted).length);
@@ -80,7 +92,9 @@ export function CollaborativeBoard({ doc, awareness, readOnly, onReady }: Collab
         }}
         onPointerUpdate={({ pointer }) => bindingRef.current?.handlePointer(pointer)}
         onPaste={(_data, event) => !hasImageFile(event)}
-      />
+      >
+        <BoardMenu menu={menu} />
+      </Excalidraw>
     </div>
   );
 }

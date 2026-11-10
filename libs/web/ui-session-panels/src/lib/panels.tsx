@@ -11,7 +11,9 @@ export function InstructionsPanel({ markdown }: { markdown: string }) {
 export function RubricPanel({ markdown }: { markdown: string }) {
   return (
     <section aria-label="Rubric" className="p-4">
-      <p className="mb-3 rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">Only interviewers can see this.</p>
+      <p className="mb-3 rounded bg-amber-50 dark:bg-amber-950 px-2 py-1 text-xs text-amber-800 dark:text-amber-200">
+        Only interviewers can see this.
+      </p>
       <Markdown source={markdown} />
     </section>
   );

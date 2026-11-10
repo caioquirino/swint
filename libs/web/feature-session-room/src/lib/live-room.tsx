@@ -5,7 +5,7 @@ import { AWARENESS_USER_FIELD } from '@swint/shared-collab-protocol';
 import { isFinished } from '@swint/shared-domain';
 import { useOrpc } from '@swint/web-data-access-api';
 import { usePresence, useCollabSession } from '@swint/web-data-access-collab';
-import { Screen, Spinner } from '@swint/web-ui-primitives';
+import { Screen, Spinner, ThemeToggle, useTheme } from '@swint/web-ui-primitives';
 import {
   ConnectionBanner,
   InstructionsPanel,
@@ -38,6 +38,7 @@ export function LiveRoom({
 }) {
   const orpc = useOrpc();
   const queryClient = useQueryClient();
+  const { resolved: theme } = useTheme();
   const { session, snapshot } = useCollabSession({ sessionId: view.sessionId, role: view.role });
   const state = useMergedSessionState(view, snapshot?.sessionState ?? null);
   const participants = usePresence(session?.board.awareness ?? null);
@@ -102,19 +103,20 @@ export function LiveRoom({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-4 py-2">
+      <header className="flex flex-wrap items-center gap-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2">
         <h1 className="font-semibold">{view.title}</h1>
         <TimerBar status={state.status} timer={state.timer} offsetMs={state.offsetMs} />
         <ParticipantList participants={participants} />
         <div className="ml-auto flex items-center gap-2">
           {interviewer && !finished ? <SessionControls sessionId={view.sessionId} status={state.status} /> : null}
           {interviewer && finished ? <ExportMenu board={board} title={view.title} /> : null}
+          <ThemeToggle />
         </div>
       </header>
       <ConnectionBanner state={bannerState(phase, Boolean(snapshot?.conn.everConnected))} />
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-96 flex-col border-r border-slate-200 bg-white">
-          <div role="tablist" className="flex border-b border-slate-200">
+        <aside className="flex w-96 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div role="tablist" className="flex border-b border-slate-200 dark:border-slate-800">
             {tabs.map((t) => (
               <button
                 key={t}
@@ -122,7 +124,11 @@ export function LiveRoom({
                 type="button"
                 aria-selected={tab === t}
                 onClick={() => setTab(t)}
-                className={tab === t ? 'border-b-2 border-blue-600 px-4 py-2 text-sm font-medium' : 'px-4 py-2 text-sm text-slate-600'}
+                className={
+                  tab === t
+                    ? 'border-b-2 border-blue-600 px-4 py-2 text-sm font-medium'
+                    : 'px-4 py-2 text-sm text-slate-600 dark:text-slate-300'
+                }
               >
                 {t === 'instructions' ? 'Instructions' : t === 'rubric' ? 'Rubric' : 'Notes'}
               </button>
@@ -142,7 +148,7 @@ export function LiveRoom({
             {tab === 'notes' && notes ? (
               <PanelBoundary title="Notes">
                 {snapshot?.notesError ? (
-                  <p className="p-4 text-sm text-slate-600">Notes are unavailable.</p>
+                  <p className="p-4 text-sm text-slate-600 dark:text-slate-300">Notes are unavailable.</p>
                 ) : (
                   <NotesEditor
                     doc={notes.doc}
@@ -158,7 +164,14 @@ export function LiveRoom({
         <main aria-label="Board" className="relative min-w-0 flex-1">
           {session ? (
             <PanelBoundary title="Board">
-              <CollaborativeBoard doc={session.board.doc} awareness={session.board.awareness} readOnly={readOnly} onReady={setBoard} />
+              <CollaborativeBoard
+                doc={session.board.doc}
+                awareness={session.board.awareness}
+                readOnly={readOnly}
+                menu={interviewer ? 'export' : 'none'}
+                theme={theme}
+                onReady={setBoard}
+              />
             </PanelBoundary>
           ) : null}
         </main>

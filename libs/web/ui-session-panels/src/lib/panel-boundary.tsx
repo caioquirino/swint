@@ -19,7 +19,10 @@ export class PanelBoundary extends Component<{ title: string; children: ReactNod
   override render() {
     if (this.state.failed) {
       return (
-        <div role="alert" className="m-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div
+          role="alert"
+          className="m-4 rounded border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950 p-3 text-sm text-red-800 dark:text-red-200"
+        >
           {this.props.title} failed to load.{' '}
           <button type="button" className="underline" onClick={() => this.setState({ failed: false })}>
             Try again

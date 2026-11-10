@@ -37,7 +37,7 @@ export function RoomUnavailableScreen() {
     <Screen
       title="This room is not available"
       actions={
-        <Link className="text-blue-700 underline" to="/">
+        <Link className="text-blue-700 dark:text-blue-400 underline" to="/">
           Go home
         </Link>
       }

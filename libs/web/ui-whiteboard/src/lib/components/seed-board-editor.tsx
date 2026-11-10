@@ -8,23 +8,29 @@ import { isSupportedElementType } from '@swint/shared-collab-protocol';
 import type { SceneApi } from '../binding/excalidraw-binding.js';
 import { BOARD_APP_STATE, enforceBoardStyle } from '../board-style.js';
 import { isSwintLibrary, SWINT_LIBRARY } from '../library/swint-library.js';
+import { BoardMenu, boardCanvasActions } from './board-menu.js';
 import { excalidrawFns } from './collaborative-board.js';
 
 export interface SeedBoardEditorProps {
   initialElements: readonly SyncedElement[];
   /** Live (non-deleted, non-image) elements after every scene change. */
   onChange: (elements: SyncedElement[]) => void;
+  theme?: 'light' | 'dark';
 }
 
 /** A local, non-collaborative Excalidraw used to author a template's starting board. */
-export function SeedBoardEditor({ initialElements, onChange }: SeedBoardEditorProps) {
+export function SeedBoardEditor({ initialElements, onChange, theme = 'light' }: SeedBoardEditorProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   return (
-    <div className="swint-board h-[420px] w-full overflow-hidden rounded-md border border-slate-300" data-testid="seed-board">
+    <div
+      className="swint-board h-[420px] w-full overflow-hidden rounded-md border border-slate-300 dark:border-slate-700"
+      data-testid="seed-board"
+    >
       <Excalidraw
         excalidrawAPI={setApi}
         initialData={{ elements: initialElements as never, appState: BOARD_APP_STATE, libraryItems: SWINT_LIBRARY as never }}
-        UIOptions={{ tools: { image: false } }}
+        theme={theme}
+        UIOptions={{ tools: { image: false }, canvasActions: boardCanvasActions('export') }}
         onLibraryChange={(items) => {
           if (!isSwintLibrary(items)) void api?.updateLibrary({ libraryItems: SWINT_LIBRARY as never, merge: false });
         }}
@@ -35,7 +41,9 @@ export function SeedBoardEditor({ initialElements, onChange }: SeedBoardEditorPr
           const styled = api ? enforceBoardStyle(live, api as unknown as SceneApi, excalidrawFns) : live;
           onChange(styled.map((e) => structuredClone(e)));
         }}
-      />
+      >
+        <BoardMenu menu="export" />
+      </Excalidraw>
     </div>
   );
 }

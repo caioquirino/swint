@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 /* Tailwind v4 only scans the app by default; the UI lives in the web libs. */
 @source '../../../libs/web';
 
@@ -8,5 +9,5 @@ body,
   height: 100%;
 }
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
 }

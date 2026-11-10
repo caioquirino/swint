@@ -23,12 +23,12 @@ export function useNow(intervalMs = 500, enabled = true): number {
 }
 
 const phaseClass = {
-  'not-started': 'bg-slate-100 text-slate-700',
-  normal: 'bg-slate-100 text-slate-900',
-  warning: 'bg-amber-100 text-amber-900',
-  critical: 'bg-red-100 text-red-800',
+  'not-started': 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
+  normal: 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100',
+  warning: 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200',
+  critical: 'bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-200',
   overtime: 'bg-red-600 text-white',
-  ended: 'bg-slate-200 text-slate-700',
+  ended: 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300',
 } as const;
 
 export interface TimerBarProps {

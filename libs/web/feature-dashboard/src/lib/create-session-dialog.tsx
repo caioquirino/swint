@@ -37,7 +37,7 @@ export function CreateSessionDialog() {
           <div className="space-y-4">
             <CopyField label="Candidate link" value={create.data.candidateUrl} />
             <CopyField label="Interviewer link" value={create.data.interviewerUrl} />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Send the candidate link only to the candidate. Anyone with it can join as the candidate.
             </p>
             <Link to={`/s/${create.data.session.id}`} className="inline-block rounded-md bg-blue-600 px-4 py-2 text-white">
@@ -53,7 +53,7 @@ export function CreateSessionDialog() {
                 required
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
-                className="mt-1 block w-full rounded border border-slate-300 px-2 py-1.5"
+                className="mt-1 block w-full rounded border border-slate-300 dark:border-slate-700 px-2 py-1.5"
               >
                 <option value="" disabled>
                   Choose a template…
@@ -73,11 +73,11 @@ export function CreateSessionDialog() {
                 maxLength={100}
                 value={candidateName}
                 onChange={(e) => setCandidateName(e.target.value)}
-                className="mt-1 block w-full rounded border border-slate-300 px-2 py-1.5"
+                className="mt-1 block w-full rounded border border-slate-300 dark:border-slate-700 px-2 py-1.5"
               />
             </label>
             {create.isError ? (
-              <p role="alert" className="text-sm text-red-700">
+              <p role="alert" className="text-sm text-red-700 dark:text-red-400">
                 {apiError(create.error)?.message ?? 'Could not create the session.'}
               </p>
             ) : null}

@@ -16,3 +16,8 @@
 .swint-board li[data-testid='addToLibrary'] {
   display: none !important;
 }
+
+/* Candidates get no main menu: hide its trigger (shortcuts are blocked in code). */
+.swint-board--no-menu [data-testid='main-menu-trigger'] {
+  display: none !important;
+}
