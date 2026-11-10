@@ -30,6 +30,7 @@
     "@tiptap/starter-kit": "^3.33.0",
     "react": "^19.0.0",
     "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tslib": "^2.3.0",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.0"
