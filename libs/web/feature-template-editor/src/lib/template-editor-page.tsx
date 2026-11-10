@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { z } from 'zod';
 import { templateInputSchema, type Template } from '@swint/shared-api-contract';
 import type { SyncedElement } from '@swint/shared-collab-protocol';
 import { apiError, useApi, useOrpc } from '@swint/web-data-access-api';
 import { Button, Screen, Spinner, useTheme } from '@swint/web-ui-primitives';
-import { SeedBoardEditor } from '@swint/web-ui-whiteboard';
-import { MarkdownField } from './markdown-field.js';
+import { SeedBoardEditor, type SeedBoardHandle } from '@swint/web-ui-whiteboard';
+import { RichMarkdownEditor } from './rich-markdown-editor.js';
+import { TEMPLATE_TABS, TemplateTabs, panelId, parseTab, tabId, type TemplateTab } from './template-tabs.js';
 
 const signature = (elements: readonly SyncedElement[]) =>
   elements
@@ -46,6 +47,24 @@ export function TemplateEditorPage() {
   return <TemplateForm key={template.data.id} loaded={template.data} initialElements={seed.data.elements as SyncedElement[]} />;
 }
 
+const TAB_OF_FIELD: Partial<Record<keyof FieldErrors, TemplateTab>> = {
+  instructionsMd: 'instructions',
+  rubricMd: 'rubric',
+  boardSeed: 'board',
+};
+
+function tabsWithErrors(errors: FieldErrors): Set<TemplateTab> {
+  const tabs = new Set<TemplateTab>();
+  for (const [field, message] of Object.entries(errors) as [keyof FieldErrors, string | undefined][]) {
+    const tab = TAB_OF_FIELD[field];
+    if (message && tab) tabs.add(tab);
+  }
+  return tabs;
+}
+
+const INPUT = 'rounded-md border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-950';
+const FIELD_ERROR = 'text-xs text-red-700 dark:text-red-400';
+
 function TemplateForm({ loaded, initialElements }: { loaded: Template | null; initialElements: SyncedElement[] }) {
   const api = useApi();
   const { resolved: theme } = useTheme();
@@ -66,8 +85,27 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
   const elementsRef = useRef<SyncedElement[]>(initialElements);
   const initialSignature = useRef(signature(initialElements));
   const [boardDirty, setBoardDirty] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tab = parseTab(params.get('tab'));
+  const boardRef = useRef<SeedBoardHandle | null>(null);
+  const errorTabs = useMemo(() => tabsWithErrors(errors), [errors]);
 
   useEffect(() => setSaveError(null), [form]);
+
+  // Excalidraw measured its canvas while hidden: re-measure whenever the board tab is shown.
+  useEffect(() => {
+    if (tab === 'board') boardRef.current?.refresh();
+  }, [tab]);
+
+  const selectTab = (next: TemplateTab) =>
+    setParams(
+      (current) => {
+        const query = new URLSearchParams(current);
+        query.set('tab', next);
+        return query;
+      },
+      { replace: true },
+    );
 
   const set = (key: keyof FormState) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -89,7 +127,11 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
     });
     if (!parsed.success) {
       const fields = z.flattenError(parsed.error).fieldErrors as Record<string, string[] | undefined>;
-      setErrors(Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v?.[0]])) as FieldErrors);
+      const next = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v?.[0]])) as FieldErrors;
+      setErrors(next);
+      const withErrors = tabsWithErrors(next);
+      const first = TEMPLATE_TABS.find((t) => withErrors.has(t.id));
+      if (first) selectTab(first.id);
       return;
     }
     setErrors({});
@@ -116,27 +158,37 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
     }
   };
 
+  const panel = (id: TemplateTab) => ({
+    id: panelId(id),
+    role: 'tabpanel' as const,
+    'aria-labelledby': tabId(id),
+    hidden: tab !== id,
+    className: 'h-full min-h-0',
+  });
+
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      <h1 className="mb-6 text-2xl font-semibold">{loaded ? 'Edit template' : 'New template'}</h1>
-      <form onSubmit={submit} className="space-y-6" noValidate>
-        <div className="grid grid-cols-[1fr_12rem] gap-4">
-          <label className="text-sm font-medium">
-            Title
-            <input
-              aria-label="Title"
-              value={form.title}
-              onChange={(e) => set('title')(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 dark:border-slate-700 px-2 py-1.5"
-            />
-            {errors.title ? (
-              <span role="alert" className="text-xs text-red-700 dark:text-red-400">
-                {errors.title}
-              </span>
-            ) : null}
-          </label>
-          <label className="text-sm font-medium">
-            Duration (minutes)
+    <form onSubmit={submit} noValidate className="flex h-full min-h-0 flex-col">
+      <header className="flex flex-wrap items-start gap-4 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+        <div className="min-w-[16rem] flex-1">
+          <h1 className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {loaded ? 'Edit template' : 'New template'}
+          </h1>
+          <input
+            aria-label="Title"
+            placeholder="Untitled template"
+            value={form.title}
+            onChange={(e) => set('title')(e.target.value)}
+            className={`${INPUT} mt-1 block w-full text-lg font-semibold`}
+          />
+          {errors.title ? (
+            <span role="alert" className={FIELD_ERROR}>
+              {errors.title}
+            </span>
+          ) : null}
+        </div>
+        <label className="text-sm font-medium">
+          Duration
+          <span className="mt-1 flex items-center gap-1.5">
             <input
               aria-label="Duration (minutes)"
               type="number"
@@ -144,46 +196,72 @@ function TemplateForm({ loaded, initialElements }: { loaded: Template | null; in
               max={240}
               value={form.durationMin}
               onChange={(e) => set('durationMin')(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 dark:border-slate-700 px-2 py-1.5"
+              className={`${INPUT} w-20`}
             />
-            {errors.durationMin ? (
-              <span role="alert" className="text-xs text-red-700 dark:text-red-400">
-                {errors.durationMin}
-              </span>
-            ) : null}
-          </label>
-        </div>
-        <MarkdownField label="Instructions" value={form.instructionsMd} onChange={set('instructionsMd')} error={errors.instructionsMd} />
-        <MarkdownField
-          label="Rubric (interviewers only)"
-          value={form.rubricMd}
-          onChange={set('rubricMd')}
-          rows={6}
-          error={errors.rubricMd}
-        />
-        <div>
-          <p className="mb-1 text-sm font-medium">Starting board</p>
-          <SeedBoardEditor initialElements={initialElements} onChange={onBoardChange} theme={theme} />
-          {errors.boardSeed ? (
-            <p role="alert" className="text-xs text-red-700 dark:text-red-400">
-              {errors.boardSeed}
+            <span className="text-slate-500 dark:text-slate-400">min</span>
+          </span>
+          {errors.durationMin ? (
+            <span role="alert" className={FIELD_ERROR}>
+              {errors.durationMin}
+            </span>
+          ) : null}
+        </label>
+        <div className="ml-auto flex flex-col items-end gap-1 self-center">
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => navigate('/')}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              Save template
+            </Button>
+          </div>
+          {saveError ? (
+            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+              {saveError}
             </p>
           ) : null}
         </div>
-        {saveError ? (
-          <p role="alert" className="text-sm text-red-700 dark:text-red-400">
-            {saveError}
-          </p>
-        ) : null}
-        <div className="flex gap-3">
-          <Button type="submit" disabled={saving}>
-            Save template
-          </Button>
-          <Button variant="secondary" onClick={() => navigate('/')}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </main>
+      </header>
+      <TemplateTabs selected={tab} onSelect={selectTab} errors={errorTabs} />
+      <div className="min-h-0 flex-1 bg-white dark:bg-slate-900">
+        <section {...panel('instructions')}>
+          <RichMarkdownEditor
+            label="Instructions"
+            value={form.instructionsMd}
+            onChange={set('instructionsMd')}
+            error={errors.instructionsMd}
+          />
+        </section>
+        <section {...panel('rubric')}>
+          <div className="flex h-full min-h-0 flex-col">
+            <p className="border-b border-slate-200 bg-amber-50 px-4 py-1.5 text-xs text-amber-900 dark:border-slate-800 dark:bg-amber-950/40 dark:text-amber-200">
+              Only interviewers see the rubric.
+            </p>
+            <div className="min-h-0 flex-1">
+              <RichMarkdownEditor label="Rubric" value={form.rubricMd} onChange={set('rubricMd')} error={errors.rubricMd} />
+            </div>
+          </div>
+        </section>
+        <section {...panel('board')}>
+          <div className="flex h-full min-h-0 flex-col gap-2 p-4">
+            <div className="min-h-0 flex-1">
+              <SeedBoardEditor
+                initialElements={initialElements}
+                onChange={onBoardChange}
+                theme={theme}
+                onReady={(handle) => {
+                  boardRef.current = handle;
+                }}
+              />
+            </div>
+            {errors.boardSeed ? (
+              <p role="alert" className={FIELD_ERROR}>
+                {errors.boardSeed}
+              </p>
+            ) : null}
+          </div>
+        </section>
+      </div>
+    </form>
   );
 }

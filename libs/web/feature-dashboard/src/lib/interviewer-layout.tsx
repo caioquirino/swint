@@ -5,9 +5,12 @@ import { RequireInterviewer } from './require-interviewer.js';
 export function InterviewerLayout() {
   return (
     <RequireInterviewer>
-      <div className="min-h-full">
+      <div className="flex h-full flex-col">
         <AppHeader />
-        <Outlet />
+        {/* Pages scroll inside this area; the template editor fills it. */}
+        <div className="min-h-0 flex-1 overflow-auto">
+          <Outlet />
+        </div>
       </div>
     </RequireInterviewer>
   );
