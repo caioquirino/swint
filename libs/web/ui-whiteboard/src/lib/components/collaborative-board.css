@@ -1,3 +1,9 @@
+/* Excalidraw stacks its canvases and UI with z-index 1-4 (and its own modals at 1000). Keep that inside the
+   board, so app dialogs and menus opened elsewhere on the page are never painted underneath it. */
+.swint-board {
+  isolation: isolate;
+}
+
 /* v1 boards hold no embeds; the binding also strips any that slip through (e.g. pasted). */
 .swint-board [data-testid='toolbar-embeddable'] {
   display: none !important;
