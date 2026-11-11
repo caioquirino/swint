@@ -38,29 +38,33 @@ export function SeedBoardEditor({ initialElements, onChange, theme = 'light', on
   return (
     <div
       ref={containerRef}
-      className="swint-board h-full min-h-[320px] w-full overflow-hidden rounded-md border border-slate-300 dark:border-slate-700"
+      className="swint-board relative h-full min-h-[320px] w-full overflow-hidden rounded-md border border-slate-300 dark:border-slate-700"
       data-testid="seed-board"
       onDragOverCapture={blockFileDrop}
       onDropCapture={blockFileDrop}
     >
-      <Excalidraw
-        excalidrawAPI={setApi}
-        initialData={{ elements: initialElements as never, appState: BOARD_APP_STATE, libraryItems: SWINT_LIBRARY as never }}
-        theme={theme}
-        UIOptions={{ tools: { image: false }, canvasActions: boardCanvasActions('export') }}
-        onLibraryChange={(items) => {
-          if (!isSwintLibrary(items)) void api?.updateLibrary({ libraryItems: SWINT_LIBRARY as never, merge: false });
-        }}
-        onChange={(elements) => {
-          const live = (elements as unknown as readonly SyncedElement[]).filter(
-            (e) => !e.isDeleted && isSupportedElementType((e as { type?: unknown }).type),
-          );
-          const styled = api ? enforceBoardStyle(live, api as unknown as SceneApi, excalidrawFns) : live;
-          onChange(styled.map((e) => structuredClone(e)));
-        }}
-      >
-        <BoardMenu menu="export" />
-      </Excalidraw>
+      {/* Excalidraw sizes itself to 100% of its parent. An absolutely positioned layer resolves that against the board's
+          real height even when the board only has its min-height (no definite height from the page), so it never collapses. */}
+      <div className="absolute inset-0">
+        <Excalidraw
+          excalidrawAPI={setApi}
+          initialData={{ elements: initialElements as never, appState: BOARD_APP_STATE, libraryItems: SWINT_LIBRARY as never }}
+          theme={theme}
+          UIOptions={{ tools: { image: false }, canvasActions: boardCanvasActions('export') }}
+          onLibraryChange={(items) => {
+            if (!isSwintLibrary(items)) void api?.updateLibrary({ libraryItems: SWINT_LIBRARY as never, merge: false });
+          }}
+          onChange={(elements) => {
+            const live = (elements as unknown as readonly SyncedElement[]).filter(
+              (e) => !e.isDeleted && isSupportedElementType((e as { type?: unknown }).type),
+            );
+            const styled = api ? enforceBoardStyle(live, api as unknown as SceneApi, excalidrawFns) : live;
+            onChange(styled.map((e) => structuredClone(e)));
+          }}
+        >
+          <BoardMenu menu="export" />
+        </Excalidraw>
+      </div>
     </div>
   );
 }
